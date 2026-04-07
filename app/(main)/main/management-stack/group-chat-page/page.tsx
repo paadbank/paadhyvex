@@ -24,8 +24,10 @@ type Message = {
 export default function GroupChatPage() {
   const nav = useNav();
   const { theme } = useTheme();
-  const selectedGroupResult = useObject<MessageGroup>('selectedGroup', { stack: true });
+  const { groupId } = (nav.peek()?.params ?? {}) as { groupId?: string };
+  const getGroupResult = useObject<(id: string) => MessageGroup | undefined>('getGroupById', { stack: true });
   const [selectedGroup, setSelectedGroup] = useState<MessageGroup | null>(null);
+  const [resolving, setResolving] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string>('');
@@ -33,15 +35,29 @@ export default function GroupChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (selectedGroupResult.isProvided) {
-      const group = selectedGroupResult.getter();
-      if (group) {
-        setSelectedGroup(group);
-      } else if (nav.isTop()) {
-        nav.pop();
-      }
+    if (!groupId) { setResolving(false); return; }
+
+    // Try registry first
+    if (getGroupResult.isProvided) {
+      const group = getGroupResult.getter()(groupId);
+      if (group) { setSelectedGroup(group); setResolving(false); return; }
     }
-  }, [selectedGroupResult.isProvided, selectedGroupResult.getter]);
+
+    // Fallback: fetch from DB
+    supabaseBrowser
+      .from('message_groups')
+      .select('id, name, created_by')
+      .eq('id', groupId)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setSelectedGroup(data);
+        } else if (nav.isTop()) {
+          nav.pop();
+        }
+        setResolving(false);
+      });
+  }, [getGroupResult.isProvided, groupId]);
 
   useEffect(() => {
     if (selectedGroup) {
@@ -101,16 +117,9 @@ export default function GroupChatPage() {
     await loadMessages();
   };
 
-  if (!selectedGroup) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: '1rem' }}>
-        <LoadingSpinner />
-        <button onClick={() => nav.pop()} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', border: 'none', background: '#dc2626', color: 'white', cursor: 'pointer' }}>
-          Cancel
-        </button>
-      </div>
-    );
-  }
+  if (resolving) return <LoadingSpinner />;
+
+  if (!selectedGroup) return null;
 
   if (loading) return <LoadingSpinner />;
 

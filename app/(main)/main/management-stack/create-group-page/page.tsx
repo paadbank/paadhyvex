@@ -69,7 +69,8 @@ export default function CreateGroupPage() {
       return;
     }
 
-    const members = Array.from(selectedUsers).map(userId => ({
+    // Include creator as a member too
+    const members = [user.id, ...Array.from(selectedUsers)].map(userId => ({
       group_id: group.id,
       user_id: userId,
     }));
@@ -83,7 +84,7 @@ export default function CreateGroupPage() {
     }
 
     setCreating(false);
-    nav.pop();
+    nav.replace('group_chat_page', { groupId: group.id });
   };
 
   if (loading || creating) return <LoadingSpinner />;

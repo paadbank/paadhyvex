@@ -17,8 +17,36 @@ type UserProfile = {
 export default function ChatPage() {
   const nav = useNav();
   const { theme } = useTheme();
-  const selectedUserResult = useObject<UserProfile>('selectedUser', { stack: true });
+  const { contactId } = (nav.peek()?.params ?? {}) as { contactId?: string };
+  const getContactResult = useObject<(id: string) => UserProfile | undefined>('getContactById', { stack: true });
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+  const [resolving, setResolving] = useState(true);
+
+  useEffect(() => {
+    if (!contactId) { setResolving(false); return; }
+
+    // Try registry first
+    if (getContactResult.isProvided) {
+      const user = getContactResult.getter()(contactId);
+      if (user) { setSelectedUser(user); setResolving(false); return; }
+    }
+
+    // Fallback: fetch from DB
+    supabaseBrowser
+      .from('profiles')
+      .select('id, full_name, role, email')
+      .eq('id', contactId)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setSelectedUser(data);
+        } else if (nav.isTop()) {
+          nav.pop();
+        }
+        setResolving(false);
+      });
+  }, [getContactResult.isProvided, contactId]);
+
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string>('');
@@ -26,17 +54,6 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const prevMessagesLengthRef = useRef(0);
-
-  useEffect(() => {
-    if (selectedUserResult.isProvided) {
-      const user = selectedUserResult.getter();
-      if (user) {
-        setSelectedUser(user);
-      } else if(nav.isTop()){
-        nav.pop();
-      }
-    }
-  }, [selectedUserResult.isProvided, selectedUserResult.getter]);
 
   useEffect(() => {
     if (selectedUser) {
@@ -105,16 +122,9 @@ export default function ChatPage() {
     await loadMessages();
   };
 
-  if (!selectedUser) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: '1rem' }}>
-        <LoadingSpinner />
-        <button onClick={() => nav.pop()} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', border: 'none', background: '#dc2626', color: 'white', cursor: 'pointer' }}>
-          Cancel
-        </button>
-      </div>
-    );
-  }
+  if (resolving) return <LoadingSpinner />;
+
+  if (!selectedUser) return null;
 
   if (loading) return <LoadingSpinner />;
 

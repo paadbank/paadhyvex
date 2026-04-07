@@ -170,11 +170,55 @@ export const useScrollBroadcast = (callback: (event: ScrollBroadcastEvent) => vo
   }, [callback]);
 };
 
+let _groupStyleMountCount = 0;
+const GROUP_STYLE_CSS = `
+  .group-navigation-stack {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  .group-stack-container {
+    width: 100%;
+    height: 100%;
+  }
+
+  .group-stack-hidden {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    opacity: 0 !important;
+  }
+
+  .group-stack-active {
+    display: block !important;
+    visibility: visible !important;
+    pointer-events: all !important;
+    opacity: 1 !important;
+  }
+
+  .group-stack-container {
+    transition: opacity 0.2s ease;
+  }
+`;
+
+export type SwipeBackOptions = {
+  edgeWidth?: number;
+  threshold?: number;
+  maxTranslate?: number | string;
+  cancelDuration?: number;
+  commitDuration?: number;
+  disabled?: boolean;
+};
+
 // ==================== Types ====================
 type NavParams = Record<string, any> | undefined;
 type LazyComponent = Promise<{ default: ComponentType<any> }>;
 type TransitionState = "enter" | "idle" | "exit" | "done";
 type ParsedStack = { code: string; params?: NavParams }[];
+export type NavActionResult =
+  | { ok: true }
+  | { ok: false; reason: 'guard' | 'lock' | 'empty-stack' | 'parent-only' };
 
 export type StackEntry = {
   // uid format: "groupId:stackId:pageUid" (composite key for scroll restoration)
@@ -210,16 +254,16 @@ type MissingRouteConfig = {
 
 export type NavStackAPI = {
   id: string;
-  push: (rawKey: string, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean>;
-  replace: (rawKey: string, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean>;
-  pop: () => Promise<boolean>;
-  popUntil: (predicate: (entry: StackEntry, idx: number, stack: StackEntry[]) => boolean) => Promise<boolean>;
-  popToRoot: () => Promise<boolean>;
-  pushAndPopUntil: (rawKey: string, predicate: (entry: StackEntry, idx: number, stack: StackEntry[]) => boolean, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean>;
-  pushAndReplace: (rawKey: string, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean>;
+  push: (rawKey: string, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean | NavActionResult>;
+  replace: (rawKey: string, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean | NavActionResult>;
+  pop: () => Promise<boolean | NavActionResult>;
+  popUntil: (predicate: (entry: StackEntry, idx: number, stack: StackEntry[]) => boolean) => Promise<boolean | NavActionResult>;
+  popToRoot: () => Promise<boolean | NavActionResult>;
+  pushAndPopUntil: (rawKey: string, predicate: (entry: StackEntry, idx: number, stack: StackEntry[]) => boolean, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean | NavActionResult>;
+  pushAndReplace: (rawKey: string, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean | NavActionResult>;
   peek: () => StackEntry | undefined;
-  go: (rawKey: string, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean>;
-  replaceParam: (params: NavParams, merge?: boolean) => Promise<boolean>;
+  go: (rawKey: string, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean | NavActionResult>;
+  replaceParam: (params: NavParams, merge?: boolean) => Promise<boolean | NavActionResult>;
 
   provideObject: <T>(
     key: string,
@@ -283,7 +327,7 @@ export type NavStackAPI = {
       provideObjects?: Record<string, () => any>;
       metadata?: StackEntry['metadata'];
     }
-  ) => Promise<boolean>;
+  ) => Promise<boolean | NavActionResult>;
 
   replaceWith: (
     rawKey: string,
@@ -293,7 +337,7 @@ export type NavStackAPI = {
       provideObjects?: Record<string, () => any>;
       metadata?: StackEntry['metadata'];
     }
-  ) => Promise<boolean>;
+  ) => Promise<boolean | NavActionResult>;
 
   goWith: (
     rawKey: string,
@@ -303,7 +347,7 @@ export type NavStackAPI = {
       provideObjects?: Record<string, () => any>;
       metadata?: StackEntry['metadata'];
     }
-  ) => Promise<boolean>;
+  ) => Promise<boolean | NavActionResult>;
 
   getStack: () => StackEntry[];
   length: () => number;
@@ -398,7 +442,6 @@ type AsyncLifecycleHandler = (context: {
 type ObjectKey = string | string[];
 
 type ObjectOptions = {
-  stack?: boolean;
   scope?: string;
   global?: boolean;
 };
@@ -439,7 +482,7 @@ class ObjectReferenceRegistry {
   private cleanupTimers = new Map<string, NodeJS.Timeout>();
   private readonly CLEANUP_TIMEOUT = 1000 * 60 * 10; // 10 minutes
 
-  // ============ Backward Compatible Methods ============
+  // Backward Compatible Methods
 
   // Register a getter function for an object (backward compatible)
   register<T>(
@@ -450,7 +493,6 @@ class ObjectReferenceRegistry {
   ): () => void {
     return this.registerWithOptions(stackId, key, getter, {
       scopeId,
-      isStackScoped: false,
       isGlobal: false
     });
   }
@@ -516,7 +558,9 @@ class ObjectReferenceRegistry {
     const keysToRemove: string[] = [];
 
     for (const [key, meta] of this.metadata.entries()) {
-      if (key.startsWith(`${stackId}:`) && meta.scopeId === scopeId) {
+      // Match both old format (stackId:scopeId:key) and new format (scopeId:key)
+      if ((key.startsWith(`${stackId}:`) && meta.scopeId === scopeId) ||
+          (key.startsWith(`${scopeId}:`) && meta.scopeId === scopeId)) {
         keysToRemove.push(key);
       }
     }
@@ -627,21 +671,19 @@ class ObjectReferenceRegistry {
   // ============ Enhanced Methods ============
 
   // Enhanced register with options
-  // Priority: global > stack > custom scope > page scope (default)
+  // Priority: global > custom scope > page scope (default with stackId)
   registerWithOptions<T>(
     stackId: string,
     key: string,
     getter: () => T | Promise<T>,
     options?: {
       scopeId?: string;
-      isStackScoped?: boolean;
       isGlobal?: boolean;
       description?: string;
     }
   ): () => void {
     const {
       scopeId,
-      isStackScoped = false,
       isGlobal = false,
       description
     } = options || {};
@@ -651,20 +693,23 @@ class ObjectReferenceRegistry {
 
     // Priority: global wins over all
     if (isGlobal) {
-      finalKey = `global:${key}`;
-      finalScopeId = 'global';
-    } else if (isStackScoped) {
-      // Stack scope is second priority
-      finalKey = `${stackId}:${key}`;
-      finalScopeId = stackId;
+      if (scopeId) {
+        // Global with custom scope: global:scopeId:key
+        finalKey = `global:${scopeId}:${key}`;
+        finalScopeId = scopeId;
+      } else {
+        // Global without scope: global:key
+        finalKey = `global:${key}`;
+        finalScopeId = 'global';
+      }
     } else if (typeof scopeId === 'string' && scopeId) {
-      // Custom scope is third priority - ✅ FIXED: removed typo 'k'
-      finalKey = `${stackId}:${scopeId}:${key}`;
+      // Custom scope (not global): scopeId:key
+      finalKey = `${scopeId}:${key}`;
       finalScopeId = scopeId;
     } else {
-      // Default to page scope
+      // Default to page scope with stackId: stackId:key
       finalKey = `${stackId}:${key}`;
-      finalScopeId = scopeId;
+      finalScopeId = undefined;
     }
 
     // Register the getter
@@ -672,7 +717,7 @@ class ObjectReferenceRegistry {
     this.metadata.set(finalKey, {
       scopeId: finalScopeId,
       description: description || `Object ${key}`,
-      isStackScoped,
+      isStackScoped: false, // Deprecated, always false now
       isGlobal,
       originalKey: key
     });
@@ -701,13 +746,11 @@ class ObjectReferenceRegistry {
     key: string,
     options?: {
       scopeId?: string;
-      isStackScoped?: boolean;
       isGlobal?: boolean;
     }
   ): { value: T | Promise<T> | undefined; patternKey: string | null } {
     const {
       scopeId,
-      isStackScoped = false,
       isGlobal = false
     } = options || {};
 
@@ -715,22 +758,24 @@ class ObjectReferenceRegistry {
     const searchPatterns: string[] = [];
 
     if (isGlobal) {
-      // Global scope
-      searchPatterns.push(`global:${key}`);
+      if (scopeId) {
+        // Global with custom scope
+        searchPatterns.push(`global:${scopeId}:${key}`);
+      } else {
+        // Global without scope
+        searchPatterns.push(`global:${key}`);
+      }
     }
 
-    if (isStackScoped) {
-      // Stack scope
+    if (scopeId && !isGlobal) {
+      // Custom scope (not global) - NO stackId prefix
+      searchPatterns.push(`${scopeId}:${key}`);
+    }
+
+    // Page scope (default fallback) - includes stackId
+    if (!isGlobal) {
       searchPatterns.push(`${stackId}:${key}`);
     }
-
-    if (scopeId) {
-      // Custom scope
-      searchPatterns.push(`${stackId}:${scopeId}:${key}`);
-    }
-
-    // Page scope (default fallback)
-    searchPatterns.push(`${stackId}:${key}`);
 
     // Try each pattern in order
     for (const pattern of searchPatterns) {
@@ -750,7 +795,6 @@ class ObjectReferenceRegistry {
     key: string,
     options?: {
       scopeId?: string;
-      isStackScoped?: boolean;
       isGlobal?: boolean;
     }
   ): T | undefined {
@@ -764,13 +808,11 @@ class ObjectReferenceRegistry {
     key: string,
     options?: {
       scopeId?: string;
-      isStackScoped?: boolean;
       isGlobal?: boolean;
     }
   ): boolean {
     const {
       scopeId,
-      isStackScoped = false,
       isGlobal = false
     } = options || {};
 
@@ -778,19 +820,24 @@ class ObjectReferenceRegistry {
     const searchPatterns: string[] = [];
 
     if (isGlobal) {
-      searchPatterns.push(`global:${key}`);
+      if (scopeId) {
+        // Global with custom scope
+        searchPatterns.push(`global:${scopeId}:${key}`);
+      } else {
+        // Global without scope
+        searchPatterns.push(`global:${key}`);
+      }
     }
 
-    if (isStackScoped) {
+    if (scopeId && !isGlobal) {
+      // Custom scope (not global) - NO stackId prefix
+      searchPatterns.push(`${scopeId}:${key}`);
+    }
+
+    // Page scope (default) - includes stackId
+    if (!isGlobal) {
       searchPatterns.push(`${stackId}:${key}`);
     }
-
-    if (scopeId) {
-      searchPatterns.push(`${stackId}:${scopeId}:${key}`);
-    }
-
-    // Page scope (default)
-    searchPatterns.push(`${stackId}:${key}`);
 
     // Check if any pattern exists
     return searchPatterns.some(pattern => this.getters.has(pattern));
@@ -1054,41 +1101,43 @@ class ObjectReferenceRegistry {
     };
   }
 
-  // Alias methods for backward compatibility
-  has = this.hasGetter;
+  has(stackId: string, key: string): boolean {
+    return this.hasWithOptions(stackId, key, {});
+  }
 }
 
 // Global instance (maintains same export)
 const globalObjectRegistry = new ObjectReferenceRegistry();
 
 // ==================== Global Systems ====================
-// Only create these on the client side
-let globalRegistry: Map<string, any>;
-let isServer = typeof window === 'undefined';
+type RegistryEntry = {
+  stack: StackEntry[];
+  listeners: Set<StackChangeListener>;
+  guards: Set<GuardFn>;
+  middlewares: Set<MiddlewareFn>;
+  maxStackSize: number;
+  historySyncEnabled: boolean;
+  snapshotBuffer: StackEntry[];
+  parentId: string | null;
+  childIds: Set<string>;
+  navLink?: NavigationMap;
+  api?: NavStackAPI;
+  currentPath?: string;
+  isInGroup?: boolean;
+  groupId?: string;
+  lifecycleHandlers: Map<LifecycleHook, Set<LifecycleHandler | AsyncLifecycleHandler>>;
+  currentState: 'active' | 'paused' | 'background';
+  lastActiveEntry?: StackEntry;
+};
 
-if (!isServer) {
-  globalRegistry = new Map<string, {
-    stack: StackEntry[];
-    listeners: Set<StackChangeListener>;
-    guards: Set<GuardFn>;
-    middlewares: Set<MiddlewareFn>;
-    maxStackSize: number;
-    historySyncEnabled: boolean;
-    snapshotBuffer: StackEntry[];
-    parentId: string | null;
-    childIds: Set<string>;
-    navLink?: NavigationMap;
-    api?: NavStackAPI;
-    currentPath?: string;
-    isInGroup?: boolean;
-    groupId?: string;
-    lifecycleHandlers: Map<LifecycleHook, Set<LifecycleHandler | AsyncLifecycleHandler>>;
-    currentState: 'active' | 'paused' | 'background';
-    lastActiveEntry?: StackEntry;
-  }>();
-} else {
-  // Server-side stub
-  globalRegistry = new Map();
+const _clientRegistry =
+  typeof window !== 'undefined' ? new Map<string, RegistryEntry>() : null;
+
+function getRegistry(): Map<string, RegistryEntry> {
+  if (typeof window !== 'undefined') {
+    return _clientRegistry!;
+  }
+  return new Map<string, RegistryEntry>();
 }
 
 // ==================== Group Context ====================
@@ -1262,8 +1311,14 @@ class TransitionManager {
 class PageMemoryManager {
   private cache = new Map<string, {
     element: ReactNode;
+    params: NavParams;
     lastActive: number;
   }>();
+
+  getMeta(uid: string): { params: NavParams } | undefined {
+    const entry = this.cache.get(uid);
+    return entry ? { params: entry.params } : undefined;
+  }
 
   get(uid: string): ReactNode | undefined {
     const entry = this.cache.get(uid);
@@ -1274,10 +1329,11 @@ class PageMemoryManager {
     return undefined;
   }
 
-  set(uid: string, element: ReactNode) {
+  set(uid: string, element: ReactNode, params: NavParams = {}) {
     this.cleanup();
     this.cache.set(uid, {
       element,
+      params,
       lastActive: Date.now()
     });
   }
@@ -1444,23 +1500,27 @@ interface ContainerData {
   score: number;
 }
 
-export function useGroupScopedScrollRestoration(
+// ==================== Unified Scroll Restoration ====================
+// Works for both standalone and group NavigationStacks with the same sophisticated logic
+
+export function useUnifiedScrollRestoration(
   api: NavStackAPI,
   renders: RenderRecord[],
   stackSnapshot: StackEntry[],
   groupContext: GroupNavigationContextType | null,
-  groupStackId: string | null
+  groupStackId: string | null,
+  enabled: boolean = true
 ) {
-  // Composite key: groupId:stackId
+  // Composite key: groupId:stackId for groups, or 'standalone:stackId' for standalone
   const groupStackKey = groupContext
     ? `${groupContext.getGroupId()}:${groupStackId}`
-    : 'root:root';
+    : `standalone:${api.id}`;
 
   const scrollData = useRef<{
     scrollContainers: Map<string, ContainerData>;
     wasActiveGroup: boolean;
-    activeListeners: Map<string, () => void>; // ✅ Track listeners by UID - persist across page visibility changes
-    pendingListeners: Set<string>; // ✅ Track UIDs that are currently being watched via MutationObserver
+    activeListeners: Map<string, () => void>;
+    pendingListeners: Set<string>;
     pendingCleanups?: Map<string, { observer: MutationObserver; timeoutId: NodeJS.Timeout }>;
   }>({
     scrollContainers: new Map(),
@@ -1469,16 +1529,8 @@ export function useGroupScopedScrollRestoration(
     pendingListeners: new Set()
   }).current;
 
+  // For standalone: always active. For groups: check if active in group
   const isActiveGroup = groupContext ? groupContext.isActiveStack(groupStackId || '') : true;
-
-  // ✅ COMPREHENSIVE DEBUG
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      (window as any).__debugScrollState = () => {
-        // Debug function available in console
-      };
-    }
-  }, [stackSnapshot, isActiveGroup, groupStackKey]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && "scrollRestoration" in window.history) {
@@ -1486,11 +1538,8 @@ export function useGroupScopedScrollRestoration(
     }
   }, []);
 
-  // Scrollable container detection with cache invalidation
+  // Same scrollable container detection as group version
   const findScrollableContainer = (uid: string): ContainerData | null => {
-    // The navstack-page div is the actual scrollable container
-    // It's set with overflow-y: auto for top pages, overflow-y: hidden for others
-    // It's unique across all groups and pages
     const pageElement = document.querySelector(`[data-nav-uid="${uid}"]`) as HTMLElement;
 
     if (!pageElement) {
@@ -1510,18 +1559,15 @@ export function useGroupScopedScrollRestoration(
       clientWidth: pageElement.clientWidth,
       scrollHeight: pageElement.scrollHeight,
       scrollWidth: pageElement.scrollWidth,
-      score: 100 // This is the container
+      score: 100
     };
   };
 
-  // Get scrollable container with cache management
   const getScrollableContainer = (uid: string): HTMLElement | null => {
     if (typeof document === 'undefined') return null;
 
-    // Check cache first
     const cached = scrollData.scrollContainers.get(uid);
     if (cached) {
-      // Verify cached element is still in DOM
       if (document.contains(cached.element)) {
         return cached.element;
       } else {
@@ -1530,36 +1576,28 @@ export function useGroupScopedScrollRestoration(
     }
 
     const container = findScrollableContainer(uid);
-
-    // Store the container
     if (container?.element) scrollData.scrollContainers.set(uid, container);
     return container?.element ?? null;
   };
 
-  // Get current scroll position
   const getCurrentScrollPosition = (container: HTMLElement): number => {
     return container.scrollTop;
   };
 
-  // Set scroll position
   const setScrollPosition = (position: number, container: HTMLElement) => {
-      container.scrollTop = position;
+    container.scrollTop = position;
   };
 
-  // Add scroll listener to the appropriate element
   const addScrollListener = (container: HTMLElement, handler: () => void) => {
     container.addEventListener('scroll', handler, { passive: true });
     return () => container.removeEventListener('scroll', handler);
   };
 
-  // ✅ CRITICAL: Track scroll position for ALL pages in stack, not just top
-  //    Hidden pages should still track scrolling if user manually scrolls them
-  //    Only remove listeners when pages are completely REMOVED from the stack
+  // Set up listeners for ALL pages in the stack (same as group version)
   useEffect(() => {
-    // ✅ Set up listeners for ALL pages in the stack, regardless of group status
-    // The listeners will remain active even when the group is inactive
-    
-    // Get ALL current UIDs from this stack (including nested) using recursive collection
+    if (!enabled) return;
+    const registry = getRegistry();
+    // Get ALL current UIDs from this stack
     const currentUids = new Set<string>();
     const collected = new Set<string>();
 
@@ -1567,17 +1605,15 @@ export function useGroupScopedScrollRestoration(
       if (collected.has(stackId)) return;
       collected.add(stackId);
 
-      const regEntry = globalRegistry.get(stackId);
+      const regEntry = registry.get(stackId);
       if (!regEntry) return;
 
-      // Add UIDs from this stack
       if (regEntry.stack && Array.isArray(regEntry.stack)) {
         regEntry.stack.forEach((entry: StackEntry) => {
           currentUids.add(entry.uid);
         });
       }
 
-      // Recursively add UIDs from child stacks
       if (regEntry.childIds && regEntry.childIds.size > 0) {
         regEntry.childIds.forEach((childId: string) => {
           collectUidsFromStack(childId);
@@ -1585,22 +1621,25 @@ export function useGroupScopedScrollRestoration(
       }
     };
 
-    // Start collection from ALL root stacks to cover entire tree across all groups
-    if (typeof window !== 'undefined' && globalRegistry) {
-      globalRegistry.forEach((regEntry, stackId) => {
-        // Only start from root stacks (no parent) to traverse entire tree
-        if (!regEntry.parentId) {
-          collectUidsFromStack(stackId);
-        }
-      });
+    // For standalone: only collect from current stack. For groups: collect from entire tree
+    if (typeof window !== 'undefined') {
+      if (groupContext) {
+        // Group mode: collect from entire tree
+        registry.forEach((regEntry, stackId) => {
+          if (!regEntry.parentId) {
+            collectUidsFromStack(stackId);
+          }
+        });
+      } else {
+        // Standalone mode: only collect from current stack
+        collectUidsFromStack(api.id);
+      }
     }
     
-    // Get already-tracked UIDs
     const trackedUids = new Set(scrollData.activeListeners.keys());
 
-    // ✅ Add listeners for NEW pages that aren't already tracked
+    // Add listeners for NEW pages that aren't already tracked
     currentUids.forEach(uid => {
-      // Skip if already tracking or pending
       if (trackedUids.has(uid) || scrollData.pendingListeners.has(uid)) {
         return;
       }
@@ -1608,10 +1647,8 @@ export function useGroupScopedScrollRestoration(
       const entry = stackSnapshot.find(e => e.uid === uid);
       if (!entry) return;
       
-      // Mark as pending to prevent duplicate retry chains
       scrollData.pendingListeners.add(uid);
 
-      // Try immediate attachment first
       const container = getScrollableContainer(uid);
       if (container) {
         attachScrollListener(uid, container, entry);
@@ -1619,7 +1656,7 @@ export function useGroupScopedScrollRestoration(
         return;
       }
 
-      // If not found, use MutationObserver to watch for DOM insertion
+      // Use MutationObserver to watch for DOM insertion
       const observer = new MutationObserver(() => {
         const container = getScrollableContainer(uid);
         if (container) {
@@ -1629,7 +1666,6 @@ export function useGroupScopedScrollRestoration(
         }
       });
 
-      // Start observing the document for changes
       observer.observe(document.body, {
         childList: true,
         subtree: true,
@@ -1637,33 +1673,27 @@ export function useGroupScopedScrollRestoration(
         characterData: false,
       });
 
-      // Timeout fallback: stop watching after 5 seconds
       const timeoutId = setTimeout(() => {
         observer.disconnect();
         scrollData.pendingListeners.delete(uid);
-        console.warn(`[ScrollRestore] Gave up watching for container ${uid} after 5 seconds`);
       }, 5000);
 
-      // Store both observer and timeout for potential cleanup
       if (!scrollData.pendingCleanups) {
         scrollData.pendingCleanups = new Map();
       }
       scrollData.pendingCleanups.set(uid, { observer, timeoutId });
     });
 
-    // Helper function to attach scroll listener
     const attachScrollListener = (uid: string, container: HTMLElement, entry: StackEntry) => {
       const handleScroll = () => {
         const scrollPosition = getCurrentScrollPosition(container);
         globalScrollData.scrollPositions.set(uid, scrollPosition);
 
-        // Calculate scroll percentage
         const scrollHeight = container?.scrollHeight ?? 0;
         const clientHeight = container?.clientHeight ?? 0;
         const maxScroll = Math.max(scrollHeight - clientHeight, 0);
         const scrollPercentage = maxScroll > 0 ? (scrollPosition / maxScroll) * 100 : 0;
 
-        // Broadcast scroll event globally
         scrollBroadcaster.broadcast({
           uid,
           pageKey: entry.key,
@@ -1677,21 +1707,18 @@ export function useGroupScopedScrollRestoration(
         });
       };
 
-      // Add listener and store cleanup function
       const removeListener = addScrollListener(container, handleScroll);
       scrollData.activeListeners.set(uid, removeListener);
     };
 
-    // ✅ DON'T remove listeners here - they persist even if group becomes inactive
-    // Listeners are only removed in the cleanup effect when pages are COMPLETELY deleted from registry
-
     return () => {
       // Empty return - listeners stay active even when stack changes
-      // This let's us track scroll on hidden pages
     };
-  }, [stackSnapshot, groupStackKey]);
+  }, [stackSnapshot, groupStackKey, api.id, groupContext, enabled]);
 
+  // Restore scroll position when page becomes active
   useEffect(() => {
+    if (!enabled) return;
     const topEntry = stackSnapshot.at(-1);
     if (!topEntry) {
       return;
@@ -1704,27 +1731,24 @@ export function useGroupScopedScrollRestoration(
     const uidChanged = uid !== lastUid;
     const becameActive = !scrollData.wasActiveGroup && isActiveGroup;
 
-    // Update for next check
     scrollData.wasActiveGroup = isActiveGroup;
 
     // Restore position when becoming active
     if (isActiveGroup && (groupStackKeyChanged || uidChanged || becameActive)) {
-
       const restoreScroll = () => {
         const scrollKey = uid;
         const container = getScrollableContainer(uid);
         if (!container) {
-          console.warn('[ScrollRestore] Container not found for restoration:', uid);
           return;
         }
         const savedPosition = globalScrollData.scrollPositions.get(scrollKey) ?? 0;
         setScrollPosition(savedPosition, container);
       };
 
-      // --- IMMEDIATE RESTORE ---
+      // Immediate restore
       restoreScroll();
 
-      // --- DOM-settled fallback ---
+      // Fallback restores
       requestAnimationFrame(() => {
         restoreScroll();
       });
@@ -1736,31 +1760,28 @@ export function useGroupScopedScrollRestoration(
     // Update global state
     globalScrollData.lastUid = uid;
     globalScrollData.lastGroupStackKey = groupStackKey;
-  }, [stackSnapshot, isActiveGroup, groupStackKey]);
+  }, [stackSnapshot, isActiveGroup, groupStackKey, enabled]);
 
-
-  // Clean up scroll for pages no longer in entire navigation system
+  // Clean up scroll for pages no longer in navigation system
   useEffect(() => {
-    // Build set of ALL valid UIDs across entire navigation tree (including nested/parent stacks)
+    if (!enabled) return;
+    const registry = getRegistry();
     const validUids = new Set<string>();
     const visited = new Set<string>();
 
-    // Recursively collect UIDs from a stack and its children
     const collectUidsRecursive = (stackId: string) => {
       if (visited.has(stackId)) return;
       visited.add(stackId);
 
-      const regEntry = globalRegistry.get(stackId);
+      const regEntry = registry.get(stackId);
       if (!regEntry) return;
 
-      // Add UIDs from this stack
       if (regEntry.stack && Array.isArray(regEntry.stack)) {
         regEntry.stack.forEach((entry: StackEntry) => {
           validUids.add(entry.uid);
         });
       }
 
-      // Recursively add UIDs from child stacks
       if (regEntry.childIds && regEntry.childIds.size > 0) {
         regEntry.childIds.forEach((childId: string) => {
           collectUidsRecursive(childId);
@@ -1768,17 +1789,21 @@ export function useGroupScopedScrollRestoration(
       }
     };
 
-    // Traverse entire registry to collect all UIDs from all stacks (including nested)
-    if (typeof window !== 'undefined' && globalRegistry) {
-      globalRegistry.forEach((regEntry, stackId) => {
-        // Only start from root stacks (no parent)
-        if (!regEntry.parentId) {
-          collectUidsRecursive(stackId);
-        }
-      });
+    if (typeof window !== 'undefined') {
+      if (groupContext) {
+        // Group mode: traverse entire registry
+        registry.forEach((regEntry, stackId) => {
+          if (!regEntry.parentId) {
+            collectUidsRecursive(stackId);
+          }
+        });
+      } else {
+        // Standalone mode: only traverse current stack
+        collectUidsRecursive(api.id);
+      }
     }
 
-    // Delete scroll entries that don't exist in ANY stack in the entire navigation
+    // Delete scroll entries that don't exist in the navigation
     const keysToDelete: string[] = [];
     globalScrollData.scrollPositions.forEach((_, key) => {
       if (!validUids.has(key)) {
@@ -1787,16 +1812,13 @@ export function useGroupScopedScrollRestoration(
     });
 
     if (keysToDelete.length > 0) {
-      // Also remove listeners for deleted pages
       keysToDelete.forEach(key => {
-        // Remove active listener
         const removeListener = scrollData.activeListeners.get(key);
         if (removeListener) {
           removeListener();
           scrollData.activeListeners.delete(key);
         }
 
-        // Clean up pending MutationObserver if still watching
         if (scrollData.pendingCleanups) {
           const cleanup = scrollData.pendingCleanups.get(key);
           if (cleanup) {
@@ -1810,13 +1832,231 @@ export function useGroupScopedScrollRestoration(
         scrollData.pendingListeners.delete(key);
       });
     }
-  }, [stackSnapshot, api]);
+  }, [stackSnapshot, api, groupContext, enabled]);
+}
+
+export function useSwipeBack(
+  containerRef: React.RefObject<HTMLElement | null>,
+  nav: NavStackAPI,
+  options: SwipeBackOptions = {}
+) {
+  const {
+    edgeWidth = 24,
+    threshold = 0.38,
+    maxTranslate,
+    cancelDuration = 300,
+    commitDuration = 200,
+    disabled = false,
+  } = options;
+
+  const gesture = useRef<{
+    active: boolean;
+    startX: number;
+    startY: number;
+    currentX: number;
+    topEl: HTMLElement | null;
+    belowEl: HTMLElement | null;
+    screenW: number;
+    locked: boolean;
+    committed: boolean;
+  }>({
+    active: false,
+    startX: 0,
+    startY: 0,
+    currentX: 0,
+    topEl: null,
+    belowEl: null,
+    screenW: 0,
+    locked: false,
+    committed: false,
+  });
+
+  useEffect(() => {
+    if (disabled || typeof window === 'undefined') return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const resolveMaxTranslate = (screenW: number) => {
+      if (typeof maxTranslate === 'number') return maxTranslate;
+      if (typeof maxTranslate === 'string' && maxTranslate.endsWith('%')) {
+        const percent = Number.parseFloat(maxTranslate);
+        return Number.isFinite(percent) ? screenW * (percent / 100) : screenW;
+      }
+      return screenW;
+    };
+
+    const getTopAndBelowPages = () => {
+      const allPages = Array.from(
+        container.querySelectorAll<HTMLElement>('[data-nav-uid]')
+      );
+      const visiblePages = allPages.filter((el) => !el.hasAttribute('inert'));
+      return {
+        top: visiblePages[visiblePages.length - 1] ?? null,
+        below: visiblePages[visiblePages.length - 2] ?? null,
+      };
+    };
+
+    const applyTranslate = (el: HTMLElement, px: number, duration = 0) => {
+      el.style.transition = duration > 0
+        ? `transform ${duration}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`
+        : 'none';
+      el.style.transform = `translateX(${px}px)`;
+      el.style.willChange = duration > 0 ? 'auto' : 'transform';
+    };
+
+    const resetTranslate = (el: HTMLElement, duration = 0) => {
+      applyTranslate(el, 0, duration);
+      if (duration > 0) {
+        el.addEventListener('transitionend', () => {
+          el.style.transition = '';
+          el.style.transform = '';
+          el.style.willChange = '';
+          el.style.pointerEvents = '';
+          el.style.boxShadow = '';
+        }, { once: true });
+      } else {
+        el.style.transition = '';
+        el.style.transform = '';
+        el.style.willChange = '';
+        el.style.pointerEvents = '';
+        el.style.boxShadow = '';
+      }
+    };
+
+    const applyBelowParallax = (el: HTMLElement, progress: number, duration = 0) => {
+      const offsetPx = -0.3 * el.offsetWidth * (1 - progress);
+      el.style.transition = duration > 0
+        ? `transform ${duration}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`
+        : 'none';
+      el.style.transform = `translateX(${offsetPx}px)`;
+    };
+
+    const resetBelow = (el: HTMLElement, duration = 0) => {
+      applyBelowParallax(el, 0, duration);
+      if (duration > 0) {
+        el.addEventListener('transitionend', () => {
+          el.style.transition = '';
+          el.style.transform = '';
+        }, { once: true });
+      } else {
+        el.style.transition = '';
+        el.style.transform = '';
+      }
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (nav.length() <= 1) return;
+      const touch = e.touches[0];
+      if (touch.clientX > edgeWidth) return;
+
+      const { top, below } = getTopAndBelowPages();
+      if (!top) return;
+
+      const g = gesture.current;
+      g.active = true;
+      g.startX = touch.clientX;
+      g.startY = touch.clientY;
+      g.currentX = touch.clientX;
+      g.screenW = window.innerWidth;
+      g.topEl = top;
+      g.belowEl = below;
+      g.locked = false;
+      g.committed = false;
+
+      top.style.pointerEvents = 'none';
+      top.style.boxShadow = '-4px 0 16px rgba(0,0,0,0.15)';
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      const g = gesture.current;
+      if (!g.active || g.locked || g.committed) return;
+
+      const touch = e.touches[0];
+      const dx = touch.clientX - g.startX;
+      const dy = touch.clientY - g.startY;
+
+      if (Math.abs(dy) > Math.abs(dx) && Math.abs(dx) < 12) {
+        g.locked = true;
+        if (g.topEl) resetTranslate(g.topEl);
+        if (g.belowEl) resetBelow(g.belowEl);
+        return;
+      }
+
+      if (dx < 0) return;
+
+      e.preventDefault();
+
+      g.currentX = touch.clientX;
+      const translatePx = Math.min(dx, resolveMaxTranslate(g.screenW));
+
+      if (g.topEl) applyTranslate(g.topEl, translatePx);
+      if (g.belowEl) applyBelowParallax(g.belowEl, Math.min(translatePx / g.screenW, 1));
+    };
+
+    const onTouchEnd = () => {
+      const g = gesture.current;
+      if (!g.active) return;
+      g.active = false;
+
+      if (g.locked) {
+        g.locked = false;
+        return;
+      }
+
+      const dx = g.currentX - g.startX;
+      const progress = dx / g.screenW;
+      const commit = progress >= threshold;
+
+      if (commit && !g.committed) {
+        g.committed = true;
+
+        if (g.topEl) applyTranslate(g.topEl, resolveMaxTranslate(g.screenW), commitDuration);
+        if (g.belowEl) applyBelowParallax(g.belowEl, 1, commitDuration);
+
+        window.setTimeout(() => {
+          void nav.pop();
+          if (g.topEl) resetTranslate(g.topEl);
+          if (g.belowEl) resetBelow(g.belowEl);
+        }, commitDuration);
+      } else {
+        if (g.topEl) resetTranslate(g.topEl, cancelDuration);
+        if (g.belowEl) resetBelow(g.belowEl, cancelDuration);
+      }
+
+      g.topEl = null;
+      g.belowEl = null;
+    };
+
+    const onTouchCancel = () => {
+      const g = gesture.current;
+      if (!g.active) return;
+      g.active = false;
+      g.locked = false;
+      if (g.topEl) resetTranslate(g.topEl, cancelDuration);
+      if (g.belowEl) resetBelow(g.belowEl, cancelDuration);
+      g.topEl = null;
+      g.belowEl = null;
+    };
+
+    container.addEventListener('touchstart', onTouchStart, { passive: true });
+    container.addEventListener('touchmove', onTouchMove, { passive: false });
+    container.addEventListener('touchend', onTouchEnd, { passive: true });
+    container.addEventListener('touchcancel', onTouchCancel, { passive: true });
+
+    return () => {
+      container.removeEventListener('touchstart', onTouchStart);
+      container.removeEventListener('touchmove', onTouchMove);
+      container.removeEventListener('touchend', onTouchEnd);
+      container.removeEventListener('touchcancel', onTouchCancel);
+    };
+  }, [nav, edgeWidth, threshold, maxTranslate, cancelDuration, commitDuration, disabled, containerRef]);
 }
 
 
 // ==================== Core Functions ====================
 const NavContext = createContext<NavStackAPI | null>(null);
 const CurrentPageContext = createContext<string | null>(null);
+const _currentPageUidByStack = new Map<string, string>();
 
 function findParentNavContext(): NavStackAPI | null {
   try {
@@ -2133,6 +2373,7 @@ function removeNavQueryParamForStack(stackId: string, groupContext: GroupNavigat
 
 
 function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, parentApi: NavStackAPI | null, currentPath: string, groupContext: GroupNavigationContextType | null = null, groupStackId: string | null): NavStackAPI {
+  const globalRegistry = getRegistry();
   const transitionManager = new TransitionManager();
   const memoryManager = new PageMemoryManager();
   const lifecycleManager = new EnhancedLifecycleManager(id);
@@ -2266,10 +2507,9 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
   let actionLock = false;
   let pendingOperations = 0;
 
-  async function withLock<T>(fn: () => Promise<T>): Promise<T | false> {
+  async function withLock<T>(fn: () => Promise<T>): Promise<T | NavActionResult> {
     if (actionLock) {
-      console.warn('[NavStack] Lock already acquired, operation rejected to prevent race condition');
-      return false as unknown as T;
+      return { ok: false, reason: 'lock' } as unknown as T;
     }
 
     actionLock = true;
@@ -2318,7 +2558,7 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
   const api: NavStackAPI = {
     id,
     async push(rawKey, params, metadata) {
-      return withLock<boolean>(async () => {
+      return withLock<boolean | NavActionResult>(async () => {
         const { key, params: p } = parseRawKey(rawKey, params);
 
         const newEntry: StackEntry = {
@@ -2366,7 +2606,7 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
     },
 
     async replace(rawKey, params, metadata) {
-      return withLock<boolean>(async () => {
+      return withLock<boolean | NavActionResult>(async () => {
         const { key, params: p } = parseRawKey(rawKey, params);
         const newEntry: StackEntry = { uid: generateCompositeUid(id, groupContext, groupStackId, key, p), key, params: p, metadata };
         const previousEntry = regEntry.stack[regEntry.stack.length - 1];
@@ -2412,24 +2652,25 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
     },
 
     async pop() {
-      return withLock<boolean>(async () => {
+      return withLock<boolean | NavActionResult>(async () => {
         if (regEntry.stack.length === 0) {
           if (regEntry.parentId) return false;
           return false;
         }
         const top = regEntry.stack[regEntry.stack.length - 1];
+        const pageBelow = regEntry.stack[regEntry.stack.length - 2];
 
         await lifecycleManager.trigger('onBeforePop', {
           stack: regEntry.stack.slice(),
           current: top,
-          previous: regEntry.stack[regEntry.stack.length - 2],
+          previous: pageBelow,
           action: { type: 'pop', target: top }
         });
 
         const action = {
           type: "pop" as const,
           from: top,
-          to: regEntry.stack[regEntry.stack.length - 2],
+          to: pageBelow,
           stackSnapshot: regEntry.stack.slice()
         };
         const ok = await runGuards(action);
@@ -2440,6 +2681,7 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
         regEntry.stack.pop();
         runMiddlewares(action);
         emit(previousStack, { type: 'pop', target: top });
+        
         // After pop lifecycle
         lifecycleManager.trigger('onAfterPop', {
           stack: regEntry.stack.slice(),
@@ -2447,12 +2689,23 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
           previous: top,
           action: { type: 'pop', target: top }
         });
+        
+        // Trigger onResume for the page we're returning to
+        if (pageBelow) {
+          lifecycleManager.trigger('onResume', {
+            stack: regEntry.stack.slice(),
+            current: pageBelow,
+            previous: top,
+            action: { type: 'pop', target: top }
+          });
+        }
+        
         return true;
       });
     },
 
     async popUntil(predicate) {
-      return withLock<boolean>(async () => {
+      return withLock<boolean | NavActionResult>(async () => {
         if (regEntry.stack.length === 0) {
           if (regEntry.parentId) return false;
           return false;
@@ -2514,7 +2767,7 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
     },
 
     async popToRoot() {
-      return withLock<boolean>(async () => {
+      return withLock<boolean | NavActionResult>(async () => {
         const action = {
           type: "popToRoot" as const,
           stackSnapshot: regEntry.stack.slice()
@@ -2569,7 +2822,7 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
     },
 
     async pushAndPopUntil(rawKey, predicate, params, metadata) {
-      return withLock<boolean>(async () => {
+      return withLock<boolean | NavActionResult>(async () => {
         const { key, params: p } = parseRawKey(rawKey, params);
         const newEntry: StackEntry = { uid: generateCompositeUid(id, groupContext, groupStackId, key, p), key, params: p, metadata };
 
@@ -2596,11 +2849,7 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
 
         regEntry.stack.push(newEntry);
 
-        runMiddlewares(action);
-
-        emit(previousStack, { type: 'pushAndPopUntil', target: newEntry });
-
-        // Now pop everything above the first match for predicate
+        // Pop below the predicate before emitting - single final state
         let i = regEntry.stack.length - 2; // start below newEntry
         const poppedEntries: StackEntry[] = [];
 
@@ -2609,6 +2858,9 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
           regEntry.stack.splice(i, 1);
           i--;
         }
+
+        runMiddlewares(action);
+        emit(previousStack, { type: 'pushAndPopUntil', target: newEntry });
 
         // After push lifecycle
         lifecycleManager.trigger('onAfterPush', {
@@ -2628,20 +2880,12 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
           });
         }
 
-        // Emit final stack state after all pop operations are complete
-        // This ensures subscribers and persistence layer get the correct final state.
-        // We pass the current final stack as "previousStack" so emit detects no page change
-        // at the top (since top entry is still newEntry) and only notifies subscribers/persists.
-        if (poppedEntries.length > 0) {
-          emit(regEntry.stack.slice(), { type: 'popUntil', target: undefined });
-        }
-
         return true;
       });
     },
 
     async pushAndReplace(rawKey, params, metadata) {
-      return withLock<boolean>(async () => {
+      return withLock<boolean | NavActionResult>(async () => {
         const { key, params: p } = parseRawKey(rawKey, params);
         const newEntry: StackEntry = { uid: generateCompositeUid(id, groupContext, groupStackId, key, p), key, params: p, metadata };
         const previousEntry = regEntry.stack[regEntry.stack.length - 1];
@@ -2684,7 +2928,7 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
     },
 
     async go(rawKey, params, metadata) {
-      return withLock<boolean>(async () => {
+      return withLock<boolean | NavActionResult>(async () => {
         const { key, params: p } = parseRawKey(rawKey, params);
         const newEntry: StackEntry = { uid: generateCompositeUid(id, groupContext, groupStackId, key, p), key, params: p, metadata };
         const previousEntry = regEntry.stack[regEntry.stack.length - 1];
@@ -2728,7 +2972,7 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
     },
 
     async replaceParam(newParams: NavParams, merge: boolean = true) {
-      return withLock<boolean>(async () => {
+      return withLock<boolean | NavActionResult>(async () => {
         const currentEntry = regEntry.stack[regEntry.stack.length - 1];
 
         if (!currentEntry) {
@@ -2797,33 +3041,30 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
       });
     },
 
-    provideObject<T>(key: string, getter: () => T | Promise<T>, options?: ObjectOptions) {
-      const { stack = false, scope, global = false } = options || {};
+    provideObject<T>(key: string, getter: () => T, options?: ObjectOptions) {
+      const { scope, global = false } = options || {};
       const current = regEntry.stack[regEntry.stack.length - 1];
 
       return globalObjectRegistry.registerWithOptions(id, key, getter, {
         scopeId: scope || current?.uid,
-        isStackScoped: stack,
         isGlobal: global
       });
     },
 
     getObject<T>(key: string, options?: ObjectOptions): T | undefined {
-      const { stack = false, scope, global = false } = options || {};
+      const { scope, global = false } = options || {};
 
       return globalObjectRegistry.getWithOptions<T>(id, key, {
         scopeId: scope,
-        isStackScoped: stack,
         isGlobal: global
       });
     },
 
     hasObject(key: string, options?: ObjectOptions): boolean {
-      const { stack = false, scope, global = false } = options || {};
+      const { scope, global = false } = options || {};
 
       return globalObjectRegistry.hasWithOptions(id, key, {
         scopeId: scope,
-        isStackScoped: stack,
         isGlobal: global
       });
     },
@@ -2845,16 +3086,18 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
       callback: (value: T) => void,
       options?: ObjectOptions
     ): () => void {
-      const { stack = false, scope, global = false } = options || {};
+      const { scope, global = false } = options || {};
 
       // Build the pattern key
       let patternKey: string;
       if (global) {
-        patternKey = `global:${key}`;
-      } else if (stack) {
-        patternKey = `${id}:${key}`;
+        if (scope) {
+          patternKey = `global:${scope}:${key}`;
+        } else {
+          patternKey = `global:${key}`;
+        }
       } else if (scope) {
-        patternKey = `${id}:${scope}:${key}`;
+        patternKey = `${scope}:${key}`;
       } else {
         patternKey = `${id}:${key}`;
       }
@@ -2873,16 +3116,18 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
       callback: () => void,
       options?: ObjectOptions
     ): () => void {
-      const { stack = false, scope, global = false } = options || {};
+      const { scope, global = false } = options || {};
 
       // Build the pattern key
       let patternKey: string;
       if (global) {
-        patternKey = `global:${key}`;
-      } else if (stack) {
-        patternKey = `${id}:${key}`;
+        if (scope) {
+          patternKey = `global:${scope}:${key}`;
+        } else {
+          patternKey = `global:${key}`;
+        }
       } else if (scope) {
-        patternKey = `${id}:${scope}:${key}`;
+        patternKey = `${scope}:${key}`;
       } else {
         patternKey = `${id}:${key}`;
       }
@@ -2898,16 +3143,18 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
       handler: (request: TRequest) => TResponse | Promise<TResponse>,
       options?: ObjectOptions
     ): () => void {
-      const { stack = false, scope, global = false } = options || {};
+      const { scope, global = false } = options || {};
 
       // Build the pattern key
       let patternKey: string;
       if (global) {
-        patternKey = `global:${key}`;
-      } else if (stack) {
-        patternKey = `${id}:${key}`;
+        if (scope) {
+          patternKey = `global:${scope}:${key}`;
+        } else {
+          patternKey = `global:${key}`;
+        }
       } else if (scope) {
-        patternKey = `${id}:${scope}:${key}`;
+        patternKey = `${scope}:${key}`;
       } else {
         patternKey = `${id}:${key}`;
       }
@@ -2920,16 +3167,18 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
       request: TRequest,
       options?: ObjectOptions
     ): Promise<TResponse> {
-      const { stack = false, scope, global = false } = options || {};
+      const { scope, global = false } = options || {};
 
       // Build the pattern key
       let patternKey: string;
       if (global) {
-        patternKey = `global:${key}`;
-      } else if (stack) {
-        patternKey = `${id}:${key}`;
+        if (scope) {
+          patternKey = `global:${scope}:${key}`;
+        } else {
+          patternKey = `global:${key}`;
+        }
       } else if (scope) {
-        patternKey = `${id}:${scope}:${key}`;
+        patternKey = `${scope}:${key}`;
       } else {
         patternKey = `${id}:${key}`;
       }
@@ -2942,16 +3191,18 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
       callback: () => void,
       options?: ObjectOptions
     ): () => void {
-      const { stack = false, scope, global = false } = options || {};
+      const { scope, global = false } = options || {};
 
       // Build the pattern key
       let patternKey: string;
       if (global) {
-        patternKey = `global:${key}`;
-      } else if (stack) {
-        patternKey = `${id}:${key}`;
+        if (scope) {
+          patternKey = `global:${scope}:${key}`;
+        } else {
+          patternKey = `global:${key}`;
+        }
       } else if (scope) {
-        patternKey = `${id}:${scope}:${key}`;
+        patternKey = `${scope}:${key}`;
       } else {
         patternKey = `${id}:${key}`;
       }
@@ -2973,9 +3224,12 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
       const { requireObjects = [], provideObjects = {}, metadata } = options || {};
 
       // Verify required objects exist
-      for (const key of requireObjects) {
-        if (!globalObjectRegistry.hasGetter(id, key)) {
-          console.warn(`Cannot push ${rawKey}: Required object "${key}" not found`);
+      for (const objKey of requireObjects) {
+        if (!objectExistsInAnyScope(objKey)) {
+          console.warn(
+            `[NavStack] Cannot push "${rawKey}": required object "${objKey}" not found ` +
+            `in any scope for stack "${id}".`
+          );
           return false;
         }
       }
@@ -3013,9 +3267,12 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
       const { requireObjects = [], provideObjects = {}, metadata } = options || {};
 
       // Verify required objects exist
-      for (const key of requireObjects) {
-        if (!globalObjectRegistry.hasGetter(id, key)) {
-          console.warn(`Cannot replace with ${rawKey}: Required object "${key}" not found`);
+      for (const objKey of requireObjects) {
+        if (!objectExistsInAnyScope(objKey)) {
+          console.warn(
+            `[NavStack] Cannot replace with "${rawKey}": required object "${objKey}" not found ` +
+            `in any scope for stack "${id}".`
+          );
           return false;
         }
       }
@@ -3053,9 +3310,12 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
       const { requireObjects = [], provideObjects = {}, metadata } = options || {};
 
       // Verify required objects exist
-      for (const key of requireObjects) {
-        if (!globalObjectRegistry.hasGetter(id, key)) {
-          console.warn(`Cannot go with ${rawKey}: Required object "${key}" not found`);
+      for (const objKey of requireObjects) {
+        if (!objectExistsInAnyScope(objKey)) {
+          console.warn(
+            `[NavStack] Cannot go with "${rawKey}": required object "${objKey}" not found ` +
+            `in any scope for stack "${id}".`
+          );
           return false;
         }
       }
@@ -3127,17 +3387,10 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
         const top = this.peek();
         return top?.uid === uid;
       }
-
-      try {
-        const currentUid = useContext(CurrentPageContext);
-        if (currentUid) {
-          const top = this.peek();
-          return top?.uid === currentUid;
-        }
-      } catch (e) {
-        console.warn("nav.isTop() called outside of page context.");
+      const registeredUid = _currentPageUidByStack.get(id);
+      if (registeredUid !== undefined) {
+        return this.peek()?.uid === registeredUid;
       }
-
       return false;
     },
 
@@ -3288,6 +3541,18 @@ function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, 
       }
     }
   };
+
+  // Helper to check object existence across all scopes
+  function objectExistsInAnyScope(key: string): boolean {
+    return (
+      globalObjectRegistry.hasWithOptions(id, key, { isGlobal: true }) ||
+      globalObjectRegistry.hasWithOptions(id, key, { isGlobal: true, scopeId: undefined }) ||
+      globalObjectRegistry.hasWithOptions(id, key, {})
+    );
+  }
+
+  // Attach helper to API for use in methods
+  (api as any).objectExistsInAnyScope = objectExistsInAnyScope;
 
   regEntry.api = api;
   (api as any).lifecycleManager = lifecycleManager;
@@ -3663,6 +3928,27 @@ export function useNav() {
   const context = useContext(NavContext);
   if (!context) throw new Error("useNav must be used within a NavigationStack");
   return context;
+}
+
+export function useIsTop(): boolean {
+  const nav = useContext(NavContext);
+  const currentUid = useContext(CurrentPageContext);
+  const [isTop, setIsTop] = useState(() => {
+    if (!nav || !currentUid) return false;
+    return nav.peek()?.uid === currentUid;
+  });
+
+  useEffect(() => {
+    if (!nav || !currentUid) return;
+
+    setIsTop(nav.peek()?.uid === currentUid);
+
+    return nav.subscribe((stack) => {
+      setIsTop(stack[stack.length - 1]?.uid === currentUid);
+    });
+  }, [nav, currentUid]);
+
+  return isTop;
 }
 
 /**
@@ -4127,14 +4413,11 @@ export function useObject<T>(
 
   const finalOptions = useMemo(() => {
     const opts = { ...optionsRef.current };
-
-    // If requesting stack-scoped without explicit scope, use current stack
-    if (opts.stack && !opts.scope && !opts.global) {
-      opts.scope = nav.id;
-    }
-
+    // stack was removed from ObjectOptions in the new version.
+    // Delete it in case any call site still passes it.
+    delete (opts as any).stack;
     return opts;
-  }, [nav.id, optionsString]);
+  }, [optionsString]);
 
   useEffect(() => {
     // Reset mounted flag when effect runs
@@ -4152,22 +4435,15 @@ export function useObject<T>(
 
       // Subscribe to getter registration
       unsubscribeRef.current = nav.onGetterRegistered?.(key, () => {
-        // Getter registered - force state update by setting a timestamp
-        if (isMountedRef.current) {
-          // Force re-run by updating both states
-          setIsProvided(false); // Reset first
-          setGetter(undefined);
-          // Trigger immediate re-check
-          setTimeout(() => {
-            if (isMountedRef.current) {
-              const newGetter = nav.getObject<() => T>(key, finalOptions);
-              if (newGetter) {
-                setGetter(() => newGetter);
-                setIsProvided(true);
-              }
-            }
-          }, 0);
-        }
+        if (!isMountedRef.current) return;
+        setTimeout(() => {
+          if (!isMountedRef.current) return;
+          const newGetter = nav.getObject<() => T>(key, finalOptions);
+          if (newGetter) {
+            setGetter(() => newGetter);
+            setIsProvided(true);
+          }
+        }, 0);
       }, finalOptions) || (() => { });
       return;
     }
@@ -4261,12 +4537,6 @@ export function useSendRequest<TRequest = any, TResponse = any>(
 
   const finalOptions = useMemo(() => {
     const opts = { ...options };
-
-    // If requesting stack-scoped without explicit scope, use current stack
-    if (opts.stack && !opts.scope && !opts.global) {
-      opts.scope = nav.id;
-    }
-
     return opts;
   }, [options, nav.id]);
 
@@ -4372,19 +4642,40 @@ export function useObjectExists(
 ): boolean {
   const nav = useContext(NavContext);
   const [exists, setExists] = useState(false);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!nav) return;
 
+    // Check immediately
     setExists(nav.hasObject(key, options));
 
-    // Optional: Watch for changes
-    const checkInterval = setInterval(() => {
-      setExists(nav.hasObject(key, options));
-    }, 100);
+    // Subscribe to getter registration to detect when object becomes available
+    const { scope, global = false } = options || {};
+    let patternKey: string;
+    if (global) {
+      if (scope) {
+        patternKey = `global:${scope}:${key}`;
+      } else {
+        patternKey = `global:${key}`;
+      }
+    } else if (scope) {
+      patternKey = `${scope}:${key}`;
+    } else {
+      patternKey = `${nav.id}:${key}`;
+    }
 
-    return () => clearInterval(checkInterval);
-  }, [nav, key, options]);
+    unsubscribeRef.current = globalObjectRegistry.onGetterRegistered(patternKey, () => {
+      setExists(true);
+    });
+
+    return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+      }
+    };
+  }, [nav, key, JSON.stringify(options)]);
 
   return exists;
 }
@@ -4505,7 +4796,7 @@ export function GroupNavigationStack({
   current,
   onCurrentChange,
   persist = false,
-  preloadAll = false,
+  preloadAll = true,
   defaultStack
 }: GroupNavigationStackProps) {
 
@@ -4516,52 +4807,23 @@ export function GroupNavigationStack({
   useEffect(() => {
     if (typeof document === "undefined") return;
 
-    // Check if styles already exist
-    if (document.getElementById("navstack-group-styles")) return;
+    _groupStyleMountCount++;
 
-    const styleEl = document.createElement("style");
-    styleEl.id = "navstack-group-styles";
-    styleEl.innerHTML = `
-      .group-navigation-stack {
-        position: relative;
-        width: 100%;
-        height: 100%;
-      }
+    let styleEl = document.getElementById("navstack-group-styles") as HTMLStyleElement | null;
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = "navstack-group-styles";
+      styleEl.innerHTML = GROUP_STYLE_CSS;
+      document.head.appendChild(styleEl);
+    }
 
-      .group-stack-container {
-        width: 100%;
-        height: 100%;
-      }
-
-      .group-stack-hidden {
-        display: none !important;
-        visibility: hidden !important;
-        pointer-events: none !important;
-        opacity: 0 !important;
-      }
-
-      .group-stack-active {
-        display: block !important;
-        visibility: visible !important;
-        pointer-events: all !important;
-        opacity: 1 !important;
-      }
-
-      /* Optional: Add transitions for smoother switching */
-      .group-stack-container {
-        transition: opacity 0.2s ease;
-      }
-    `;
-
-    document.head.appendChild(styleEl);
-
-    // Cleanup function
     return () => {
-      // Only remove if this is the last GroupNavigationStack
-      // You might want to keep it if you have multiple groups
-      const styleElement = document.getElementById("navstack-group-styles");
-      if (styleElement && styleElement.parentNode) {
-        styleElement.parentNode.removeChild(styleElement);
+      _groupStyleMountCount--;
+      if (_groupStyleMountCount === 0) {
+        const styleElement = document.getElementById("navstack-group-styles");
+        if (styleElement && styleElement.parentNode) {
+          styleElement.parentNode.removeChild(styleElement);
+        }
       }
     };
   }, []);
@@ -4701,7 +4963,7 @@ export function GroupNavigationStack({
               data-active={isActive}
             >
               <GroupStackIdContext.Provider value={stackId}>
-                {stackEl}
+                {(isActive || preloadAll) && stackEl}
               </GroupStackIdContext.Provider>
             </div>
           );
@@ -4827,6 +5089,7 @@ export default function NavigationStack(props: {
    * Allows retrieving related components by tag
    */
   componentTags?: Record<string, NavigationMap>;
+  swipeBack?: boolean | SwipeBackOptions;
 }) {
   const {
     id,
@@ -4847,6 +5110,7 @@ export default function NavigationStack(props: {
     enableScrollRestoration = true,
     additionalNavLinks = [],
     componentTags = {},
+    swipeBack = true,
   } = props;
 
   // Memoize additional navlinks to prevent unnecessary recalculations
@@ -4888,6 +5152,7 @@ export default function NavigationStack(props: {
 
   const [isInitialized, setInitialized] = useState(false);
   const [stackSnapshot, setStackSnapshot] = useState<StackEntry[]>([]);
+  const swipeContainerRef = useRef<HTMLDivElement>(null);
   const currentPathRef = useRef(
     typeof window !== 'undefined' ? window.location.pathname : ''
   );
@@ -4898,10 +5163,11 @@ export default function NavigationStack(props: {
   }, []);
 
   const api = useMemo(() => {
+    const registry = getRegistry();
     const newApi = createApiFor(id, mergedNavLink, syncHistory || false, parentApi, currentPathRef.current, groupContext, groupStackId);
 
     if (parentApi) {
-      const parentReg = globalRegistry.get(parentApi.id);
+      const parentReg = registry.get(parentApi.id);
       if (parentReg) {
         parentReg.childIds.add(id);
       }
@@ -4923,7 +5189,7 @@ export default function NavigationStack(props: {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const regEntry = globalRegistry.get(id);
+    const regEntry = getRegistry().get(id);
     if (!regEntry) return;
 
     const lifecycleManager = api._getLifecycleManager();
@@ -4941,14 +5207,15 @@ export default function NavigationStack(props: {
 
   // Update the registry with the current path reference
   useEffect(() => {
-    const regEntry = globalRegistry.get(id);
+    const regEntry = getRegistry().get(id);
     if (regEntry) {
       regEntry.currentPath = currentPathRef.current;
     }
   }, [id]);
 
   useIsomorphicLayoutEffect(() => {
-    let regEntry = globalRegistry.get(id);
+    const registry = getRegistry();
+    let regEntry = registry.get(id);
     if (!regEntry) {
       regEntry = {
         stack: [],
@@ -4961,8 +5228,11 @@ export default function NavigationStack(props: {
         parentId: parentApi?.id || null,
         childIds: new Set(),
         navLink,
+        lifecycleHandlers: new Map(),
+        currentState: 'active',
+        lastActiveEntry: undefined,
       };
-      globalRegistry.set(id, regEntry);
+      registry.set(id, regEntry);
     } else {
       regEntry.navLink = navLink;
       regEntry.parentId = parentApi?.id || null;
@@ -5030,7 +5300,7 @@ export default function NavigationStack(props: {
 
 
   useEffect(() => {
-    const currentRegEntry = globalRegistry.get(id);
+    const currentRegEntry = getRegistry().get(id);
     if (!currentRegEntry || !groupContext || !groupStackId) return;
     const active = groupContext.isActiveStack(groupStackId);
     if ((syncHistory || currentRegEntry.historySyncEnabled) && active) {
@@ -5053,7 +5323,7 @@ export default function NavigationStack(props: {
     if (typeof window === "undefined") return;
 
     const handlePopState = (event: PopStateEvent) => {
-      const currentRegEntry = globalRegistry.get(id);
+      const currentRegEntry = getRegistry().get(id);
       if (!currentRegEntry) return;
 
       if (!api.isActiveStack()) return;
@@ -5140,10 +5410,15 @@ export default function NavigationStack(props: {
 
   useEffect(() => {
     if (typeof document === "undefined") return;
-    if (document.getElementById("navstack-builtins")) return;
+    const styleId = "navstack-builtins";
+    let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
 
-    const styleEl = document.createElement("style");
-    styleEl.id = "navstack-builtins";
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = styleId;
+      document.head.appendChild(styleEl);
+    }
+
     styleEl.innerHTML = `
       .navstack-root {  display: block; width: 100%; height: auto; overflow: hidden;}
       .navstack-page {  display: block; width: 100%; height: auto; overflow: visible; }
@@ -5160,20 +5435,33 @@ export default function NavigationStack(props: {
       .navstack-missing-route-button { margin-top: 0.5rem; padding: 0.375rem 0.75rem; background-color: #0d6efd; color: white; border: none; border-radius: 0.25rem; cursor: pointer; }
       .navstack-missing-route-button:hover { background-color: #0b5ed7; }
     `;
-    document.head.appendChild(styleEl);
-    return () => styleEl.remove();
   }, [transitionDuration]);
 
   const [renders, setRenders] = useState<RenderRecord[]>(
     () => stackSnapshot.map((e) => ({ entry: e, state: "idle", createdAt: Date.now() }))
   );
 
+    useLayoutEffect(() => {
+      const topEntry = stackSnapshot[stackSnapshot.length - 1];
+      if (topEntry) {
+        _currentPageUidByStack.set(id, topEntry.uid);
+      } else {
+        _currentPageUidByStack.delete(id);
+      }
+
+      return () => {
+        _currentPageUidByStack.delete(id);
+      };
+    }, [id, stackSnapshot]);
+
   const transitionManager = useRef<TransitionManager>(new TransitionManager()).current;
   const memoryManager = useRef<PageMemoryManager>(new PageMemoryManager()).current;
+  const swipeBackOptions = typeof swipeBack === 'object'
+    ? swipeBack
+    : { disabled: swipeBack === false };
 
-  if (enableScrollRestoration) {
-    useGroupScopedScrollRestoration(api, renders, stackSnapshot, groupContext, groupStackId);
-  }
+  useUnifiedScrollRestoration(api, renders, stackSnapshot, groupContext, groupStackId, enableScrollRestoration);
+  useSwipeBack(swipeContainerRef, api, swipeBackOptions);
 
 
   useEffect(() => {
@@ -5218,7 +5506,7 @@ export default function NavigationStack(props: {
   function renderEntry(rec: RenderRecord, idx: number) {
     const topEntry = stackSnapshot[stackSnapshot.length - 1];
     const isTop = topEntry ? rec.entry.uid === topEntry.uid : false;
-    const pageOrComp = navLink[rec.entry.key];
+    const pageOrComp = mergedNavLink[rec.entry.key];
 
     // 🔥 CRITICAL: Always get the FRESH entry from current stack
     const currentEntry = stackSnapshot.find(s => s.uid === rec.entry.uid) || rec.entry;
@@ -5226,8 +5514,10 @@ export default function NavigationStack(props: {
 
     // 🔥 Check if params changed since last render
     const cached = memoryManager.get(rec.entry.uid);
-    const hasParamChanges = cached &&
-      JSON.stringify(currentParams) !== JSON.stringify(rec.entry.params);
+    const cachedMeta = memoryManager.getMeta(rec.entry.uid);
+    const hasParamChanges = cached && cachedMeta
+      ? JSON.stringify(currentParams) !== JSON.stringify(cachedMeta.params)
+      : false;
 
     let child: ReactNode = null;
 
@@ -5370,7 +5660,11 @@ export default function NavigationStack(props: {
 
   return (
     <NavContext.Provider value={api}>
-      <div className={`navstack-root ${className ?? ""}`} style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", ...style }}>
+      <div
+        ref={swipeContainerRef}
+        className={`navstack-root ${className ?? ""}`}
+        style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", ...style }}
+      >
         {renders.map((r, idx) => (
           <React.Fragment key={r.entry.uid}>
             {renderEntry(r, idx)}
@@ -5383,7 +5677,7 @@ export default function NavigationStack(props: {
 
 if (typeof module !== 'undefined' && (module as any).hot) {
   (module as any).hot.dispose(() => {
-    globalRegistry.forEach((_, id) => {
+    getRegistry().forEach((_, id) => {
       const api = createApiFor(id, {}, false, null, '', null, null);
       api.dispose();
     });

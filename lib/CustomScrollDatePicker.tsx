@@ -20,6 +20,8 @@ interface CustomScrollDatePickerProps {
   formatMonthsNames?: ((monthIndex: number) => string) | string;
   minYear?: number;
   maxYear?: number;
+  maxDate?: Date;
+  minDate?: Date;
 };
 
 interface WheelColumnProps {
@@ -250,25 +252,70 @@ const CustomScrollDatePicker : React.FC<CustomScrollDatePickerProps> =  ({
   formatMonthsNames ,
   minYear = 1900,
   maxYear = new Date().getFullYear() + 1,
+  maxDate,
+  minDate,
 }) => {
   const [id] = useState(() => providedId || `datepicker-${Math.random().toString(36).substr(2, 9)}`);
   useInjectStyles(id);
 
   const today = useMemo(() => new Date(), []);
+  const effectiveMaxYear = useMemo(() => {
+    if (maxDate) {
+      return maxDate.getFullYear();
+    }
+    return maxYear;
+  }, [maxDate, maxYear]);
+
+  const effectiveMinYear = useMemo(() => {
+    if (minDate) {
+      return minDate.getFullYear();
+    }
+    return minYear;
+  }, [minDate, minYear]);
+  
   const initDate = useMemo(
-    () => (defaultDate ? (startFromDate || today) : new Date(minYear, 0, 1)),
-    [defaultDate, startFromDate, minYear]
+    () => (defaultDate ? (startFromDate || today) : new Date(effectiveMinYear, 0, 1)),
+    [defaultDate, startFromDate, effectiveMinYear]
   );
 
-  const years = useMemo(
-    () => Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i),
-    [minYear, maxYear]
-  );
+  const years = useMemo(() => {
+    const allYears = Array.from({ length: effectiveMaxYear - effectiveMinYear + 1 }, (_, i) => effectiveMinYear + i);
+    
+    // Filter years based on minDate and maxDate
+    return allYears.filter(year => {
+      if (minDate && year < minDate.getFullYear()) return false;
+      if (maxDate && year > maxDate.getFullYear()) return false;
+      return true;
+    });
+  }, [effectiveMinYear, effectiveMaxYear, minDate, maxDate]);
 
   const [selectedDate, setSelectedDate] = useState(initDate);
-  const [dayIndex, setDayIndex] = useState(initDate.getDate() - 1);
-  const [monthIndex, setMonthIndex] = useState(initDate.getMonth());
-  const [yearIndex, setYearIndex] = useState(initDate.getFullYear() - minYear);
+  const [dayIndex, setDayIndex] = useState(() => {
+    const currentYear = initDate.getFullYear();
+    const currentMonth = initDate.getMonth();
+    let minDay = 1;
+    
+    if (minDate && currentYear === minDate.getFullYear() && currentMonth === minDate.getMonth()) {
+      minDay = minDate.getDate();
+    }
+    
+    return initDate.getDate() - minDay;
+  });
+  const [monthIndex, setMonthIndex] = useState(() => {
+    const currentYear = initDate.getFullYear();
+    let startMonth = 0;
+    
+    if (minDate && currentYear === minDate.getFullYear()) {
+      startMonth = minDate.getMonth();
+    }
+    
+    return initDate.getMonth() - startMonth;
+  });
+  const [yearIndex, setYearIndex] = useState(() => {
+    const actualYear = initDate.getFullYear();
+    const minYear = minDate ? minDate.getFullYear() : effectiveMinYear;
+    return actualYear - minYear;
+  });
 
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
@@ -276,27 +323,80 @@ const CustomScrollDatePicker : React.FC<CustomScrollDatePickerProps> =  ({
   const isToday = selectedDate.toDateString() === today.toDateString();
   const isYesterday = selectedDate.toDateString() === yesterday.toDateString();
 
+  // Helper to get actual month index from filtered monthIndex
+  const getActualMonthIndex = useCallback(() => {
+    const currentYear = years[yearIndex];
+    let startMonth = 0;
+    
+    if (minDate && currentYear === minDate.getFullYear()) {
+      startMonth = minDate.getMonth();
+    }
+    
+    return startMonth + monthIndex;
+  }, [years, yearIndex, monthIndex, minDate]);
+
   const daysInMonth = getDaysInMonth(monthIndex, years[yearIndex]);
-  const dayOptions = useMemo(
-    () => Array.from({ length: daysInMonth }, (_, i) => i + 1),
-    [daysInMonth]
-  );
+  const dayOptions = useMemo(() => {
+    const currentYear = years[yearIndex];
+    const actualMonthIndex = getActualMonthIndex();
+    let maxDay = getDaysInMonth(actualMonthIndex, currentYear);
+    let minDay = 1;
+    
+    // Constrain max day if we're in maxDate's month/year
+    if (maxDate && currentYear === maxDate.getFullYear() && actualMonthIndex === maxDate.getMonth()) {
+      maxDay = Math.min(maxDay, maxDate.getDate());
+    }
+    
+    // Constrain min day if we're in minDate's month/year
+    if (minDate && currentYear === minDate.getFullYear() && actualMonthIndex === minDate.getMonth()) {
+      minDay = Math.max(minDay, minDate.getDate());
+    }
+    
+    return Array.from({ length: maxDay - minDay + 1 }, (_, i) => minDay + i);
+  }, [years, yearIndex, monthIndex, maxDate, minDate, getActualMonthIndex]);
 
   const monthOptions = useMemo(() => {
-      if (typeof formatMonthsNames === 'function') {
-        return defaultMonthNames.map((_, i) => formatMonthsNames(i));
-      } else if (typeof formatMonthsNames === 'string') {
-        return defaultMonthNames;
-      }
-      return defaultMonthNames;
-    }, [formatMonthsNames]);
+    const currentYear = years[yearIndex];
+    let months: string[] = [];
+    
+    if (typeof formatMonthsNames === 'function') {
+      months = defaultMonthNames.map((_, i) => formatMonthsNames(i));
+    } else {
+      months = defaultMonthNames;
+    }
+    
+    // Filter months based on maxDate and minDate
+    let startMonth = 0;
+    let endMonth = 11;
+    
+    if (maxDate && currentYear === maxDate.getFullYear()) {
+      endMonth = maxDate.getMonth();
+    }
+    
+    if (minDate && currentYear === minDate.getFullYear()) {
+      startMonth = minDate.getMonth();
+    }
+    
+    return months.slice(startMonth, endMonth + 1);
+  }, [formatMonthsNames, years, yearIndex, maxDate, minDate]);
 
   const updateDate = useCallback(
     (d: number, m: number, y: number) => {
-      const newDate = new Date(y, m, d);
+      let newDate = new Date(y, m, d);
+      
+      // Enforce maxDate constraint
+      if (maxDate && newDate > maxDate) {
+        newDate = new Date(maxDate);
+      }
+      
+      // Enforce minDate constraint
+      if (minDate && newDate < minDate) {
+        newDate = new Date(minDate);
+      }
+      
       setSelectedDate(newDate);
     },
-    [onChange]
+    [maxDate, minDate]
   );
 
   useEffect(() => {
@@ -304,41 +404,144 @@ const CustomScrollDatePicker : React.FC<CustomScrollDatePickerProps> =  ({
     }, [selectedDate]);
 
   const handleDayChange = (index: number) => {
+    const currentYear = years[yearIndex];
+    const currentMonth = getActualMonthIndex();
+    let minDay = 1;
+    
+    if (minDate && currentYear === minDate.getFullYear() && currentMonth === minDate.getMonth()) {
+      minDay = minDate.getDate();
+    }
+    
+    const proposedDay = dayOptions[index];
     setDayIndex(index);
-    updateDate(index + 1, monthIndex, years[yearIndex]);
+    updateDate(proposedDay, currentMonth, currentYear);
   };
+  
   const handleMonthChange = (index: number) => {
+    const proposedYear = years[yearIndex];
+    let startMonth = 0;
+    
+    if (minDate && proposedYear === minDate.getFullYear()) {
+      startMonth = minDate.getMonth();
+    }
+    
+    const actualMonthIndex = startMonth + index;
     setMonthIndex(index);
-    const maxDay = getDaysInMonth(index, years[yearIndex]);
-    const day = Math.min(dayIndex + 1, maxDay);
-    updateDate(day, index, years[yearIndex]);
-    if (day !== dayIndex + 1) setDayIndex(day - 1);
+    
+    const maxDay = getDaysInMonth(actualMonthIndex, proposedYear);
+    let minDay = 1;
+    let constrainedMaxDay = maxDay;
+    
+    // Constrain day range for the new month
+    if (maxDate && proposedYear === maxDate.getFullYear() && actualMonthIndex === maxDate.getMonth()) {
+      constrainedMaxDay = Math.min(maxDay, maxDate.getDate());
+    }
+    
+    if (minDate && proposedYear === minDate.getFullYear() && actualMonthIndex === minDate.getMonth()) {
+      minDay = minDate.getDate();
+    }
+    
+    // Get current selected day value
+    const currentDayValue = dayOptions[dayIndex];
+    let newDayValue = Math.min(Math.max(currentDayValue, minDay), constrainedMaxDay);
+    let newDayIndex = newDayValue - minDay;
+    
+    setDayIndex(newDayIndex);
+    updateDate(newDayValue, actualMonthIndex, proposedYear);
   };
   const handleYearChange = (index: number) => {
+    const proposedYear = years[index];
     setYearIndex(index);
-    const year = years[index];
-    const maxDay = getDaysInMonth(monthIndex, year);
-    const day = Math.min(dayIndex + 1, maxDay);
-    updateDate(day, monthIndex, year);
-    if (day !== dayIndex + 1) setDayIndex(day - 1);
+    
+    // Recalculate month constraints for new year
+    let startMonth = 0;
+    let endMonth = 11;
+    
+    if (maxDate && proposedYear === maxDate.getFullYear()) {
+      endMonth = maxDate.getMonth();
+    }
+    
+    if (minDate && proposedYear === minDate.getFullYear()) {
+      startMonth = minDate.getMonth();
+    }
+    
+    // Get current actual month
+    const oldActualMonth = getActualMonthIndex();
+    
+    // Constrain to new valid range
+    let newActualMonth = Math.min(Math.max(oldActualMonth, startMonth), endMonth);
+    let newMonthIndex = newActualMonth - startMonth;
+    
+    setMonthIndex(newMonthIndex);
+    
+    // Recalculate day constraints
+    const maxDay = getDaysInMonth(newActualMonth, proposedYear);
+    let minDay = 1;
+    let constrainedMaxDay = maxDay;
+    
+    if (maxDate && proposedYear === maxDate.getFullYear() && newActualMonth === maxDate.getMonth()) {
+      constrainedMaxDay = Math.min(maxDay, maxDate.getDate());
+    }
+    
+    if (minDate && proposedYear === minDate.getFullYear() && newActualMonth === minDate.getMonth()) {
+      minDay = minDate.getDate();
+    }
+    
+    // Get current day value and constrain it
+    const currentDayValue = dayOptions[dayIndex] || 1;
+    let newDayValue = Math.min(Math.max(currentDayValue, minDay), constrainedMaxDay);
+    let newDayIndex = newDayValue - minDay;
+    
+    setDayIndex(newDayIndex);
+    updateDate(newDayValue, newActualMonth, proposedYear);
   };
 
   // quick actions
   const setToToday = () => {
     const d = new Date();
-    setDayIndex(d.getDate() - 1);
-    setMonthIndex(d.getMonth());
-    setYearIndex(d.getFullYear() - minYear);
-    updateDate(d.getDate(), d.getMonth(), d.getFullYear());
+    const currentYear = d.getFullYear();
+    const currentMonth = d.getMonth();
+    
+    let startMonth = 0;
+    if (minDate && currentYear === minDate.getFullYear()) {
+      startMonth = minDate.getMonth();
+    }
+    
+    let minDay = 1;
+    if (minDate && currentYear === minDate.getFullYear() && currentMonth === minDate.getMonth()) {
+      minDay = minDate.getDate();
+    }
+    
+    const minYear = minDate ? minDate.getFullYear() : effectiveMinYear;
+    
+    setDayIndex(d.getDate() - minDay);
+    setMonthIndex(currentMonth - startMonth);
+    setYearIndex(currentYear - minYear);
+    updateDate(d.getDate(), currentMonth, currentYear);
   };
 
   const setToYesterday = () => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    setDayIndex(d.getDate() - 1);
-    setMonthIndex(d.getMonth());
-    setYearIndex(d.getFullYear() - minYear);
-    updateDate(d.getDate(), d.getMonth(), d.getFullYear());
+    const currentYear = d.getFullYear();
+    const currentMonth = d.getMonth();
+    
+    let startMonth = 0;
+    if (minDate && currentYear === minDate.getFullYear()) {
+      startMonth = minDate.getMonth();
+    }
+    
+    let minDay = 1;
+    if (minDate && currentYear === minDate.getFullYear() && currentMonth === minDate.getMonth()) {
+      minDay = minDate.getDate();
+    }
+    
+    const minYear = minDate ? minDate.getFullYear() : effectiveMinYear;
+    
+    setDayIndex(d.getDate() - minDay);
+    setMonthIndex(currentMonth - startMonth);
+    setYearIndex(currentYear - minYear);
+    updateDate(d.getDate(), currentMonth, currentYear);
   };
 
   return (

@@ -1,12 +1,11 @@
 'use client';
 
-import { useNav, useProvideObject } from '@/lib/NavigationStack';
+import { useNav, useProvideObject, usePageLifecycle } from '@/lib/NavigationStack';
 import { useState, useEffect } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner';
 import EmptyRecord from '@/components/EmptyRecord/EmptyRecord';
-import ChatPage from '../chat-page/page';
 import styles from './page.module.css';
 
 type UserProfile = {
@@ -31,14 +30,18 @@ export default function MessagingPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
-  const [currentUserId, setCurrentUserId] = useState('');
-  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [groups, setGroups] = useState<MessageGroup[]>([]);
-  const [selectedGroup, setSelectedGroup] = useState<MessageGroup | null>(null);
   const [activeTab, setActiveTab] = useState<'contacts' | 'groups'>('contacts');
 
-  useProvideObject('selectedUser', () => selectedUser, { stack: true, dependencies: [selectedUser] });
-  useProvideObject('selectedGroup', () => selectedGroup, { stack: true, dependencies: [selectedGroup] });
+  useProvideObject('getContactById', () => (id: string) => users.find(u => u.id === id), { global: true, scope: 'chats', dependencies: [users] });
+  useProvideObject('getGroupById', () => (id: string) => groups.find(g => g.id === id), { global: true, scope: 'chats', dependencies: [groups] });
+
+  usePageLifecycle(nav, {
+    onResume: () => {
+      loadGroups();
+      loadUsers();
+    },
+  }, []);
 
   useEffect(() => {
     loadUsers();
@@ -55,8 +58,6 @@ export default function MessagingPage() {
       const { data: { user } } = await supabaseBrowser.auth.getUser();
       if (!user) return;
 
-      setCurrentUserId(user.id);
-
       const { data } = await supabaseBrowser
         .from('profiles')
         .select('id, full_name, role, email')
@@ -65,7 +66,6 @@ export default function MessagingPage() {
 
       setUsers(data || []);
 
-      // Load recent chats
       const { data: messages } = await supabaseBrowser
         .from('messages')
         .select('sender_id, recipient_id, created_at')
@@ -81,7 +81,6 @@ export default function MessagingPage() {
 
       const recentUsers = (data || []).filter(u => recentUserIds.has(u.id)).slice(0, 5);
       setRecentChats(recentUsers);
-
       setLoading(false);
     } catch (err) {
       console.error('Error:', err);
@@ -91,18 +90,15 @@ export default function MessagingPage() {
 
   const filterUsers = () => {
     let filtered = users;
-
     if (searchQuery) {
       filtered = filtered.filter(u =>
         u.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         u.email.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
-
     if (roleFilter !== 'all') {
       filtered = filtered.filter(u => u.role === roleFilter);
     }
-
     setFilteredUsers(filtered);
   };
 
@@ -113,7 +109,8 @@ export default function MessagingPage() {
 
       const { data } = await supabaseBrowser
         .from('message_groups')
-        .select('*')
+        .select('*, message_group_members!inner(user_id)')
+        .eq('message_group_members.user_id', user.id)
         .order('created_at', { ascending: false });
 
       setGroups(data || []);
@@ -123,17 +120,11 @@ export default function MessagingPage() {
   };
 
   const openChat = (user: UserProfile) => {
-    setSelectedUser(user);
-    setTimeout(() => nav.push('chat_page'), 0);
+    nav.push('chat_page', { contactId: user.id });
   };
 
   const openGroupChat = (group: MessageGroup) => {
-    setSelectedGroup(group);
-    setTimeout(() => nav.push('group_chat_page'), 0);
-  };
-
-  const createGroup = () => {
-    nav.push('create_group_page');
+    nav.push('group_chat_page', { groupId: group.id });
   };
 
   if (loading) return <LoadingSpinner />;
@@ -153,22 +144,16 @@ export default function MessagingPage() {
 
       <div className={styles.innerBody}>
         <div className={styles.tabs}>
-          <button
-            onClick={() => setActiveTab('contacts')}
-            className={`${styles.tab} ${activeTab === 'contacts' ? styles.tabActive : ''}`}
-          >
+          <button onClick={() => setActiveTab('contacts')} className={`${styles.tab} ${activeTab === 'contacts' ? styles.tabActive : ''}`}>
             Contacts
           </button>
-          <button
-            onClick={() => setActiveTab('groups')}
-            className={`${styles.tab} ${activeTab === 'groups' ? styles.tabActive : ''}`}
-          >
+          <button onClick={() => setActiveTab('groups')} className={`${styles.tab} ${activeTab === 'groups' ? styles.tabActive : ''}`}>
             Groups
           </button>
         </div>
 
         {activeTab === 'groups' && (
-          <button onClick={createGroup} className={styles.createGroupButton}>
+          <button onClick={() => nav.push('create_group_page')} className={styles.createGroupButton}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
@@ -179,76 +164,56 @@ export default function MessagingPage() {
 
         {activeTab === 'contacts' && (
           <>
-        <div className={styles.searchBar}>
-          <input
-            type="text"
-            placeholder="Search contacts..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className={`${styles.searchInput} ${styles[`searchInput_${theme}`]}`}
-          />
-        </div>
+            <div className={styles.searchBar}>
+              <input
+                type="text"
+                placeholder="Search contacts..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={`${styles.searchInput} ${styles[`searchInput_${theme}`]}`}
+              />
+            </div>
 
-        <div className={styles.filters}>
-          <button onClick={() => setRoleFilter('all')} className={`${styles.filter} ${roleFilter === 'all' ? styles.filterActive : ''}`}>
-            All
-          </button>
-          <button onClick={() => setRoleFilter('beneficiary')} className={`${styles.filter} ${roleFilter === 'beneficiary' ? styles.filterActive : ''}`}>
-            Beneficiaries
-          </button>
-          <button onClick={() => setRoleFilter('distributor')} className={`${styles.filter} ${roleFilter === 'distributor' ? styles.filterActive : ''}`}>
-            Distributors
-          </button>
-          <button onClick={() => setRoleFilter('admin')} className={`${styles.filter} ${roleFilter === 'admin' ? styles.filterActive : ''}`}>
-            Admins
-          </button>
-        </div>
+            <div className={styles.filters}>
+              <button onClick={() => setRoleFilter('all')} className={`${styles.filter} ${roleFilter === 'all' ? styles.filterActive : ''}`}>All</button>
+              <button onClick={() => setRoleFilter('beneficiary')} className={`${styles.filter} ${roleFilter === 'beneficiary' ? styles.filterActive : ''}`}>Beneficiaries</button>
+              <button onClick={() => setRoleFilter('distributor')} className={`${styles.filter} ${roleFilter === 'distributor' ? styles.filterActive : ''}`}>Distributors</button>
+              <button onClick={() => setRoleFilter('admin')} className={`${styles.filter} ${roleFilter === 'admin' ? styles.filterActive : ''}`}>Admins</button>
+            </div>
 
-        {recentChats.length > 0 && !searchQuery && roleFilter === 'all' && (
-          <div className={styles.section}>
-            <h2 className={styles.sectionTitle}>Recent</h2>
-            {recentChats.map(user => (
-              <div
-                key={user.id}
-                className={`${styles.contactCard} ${styles[`contactCard_${theme}`]}`}
-                onClick={() => openChat(user)}
-              >
-                <div className={styles.avatar}>{user.full_name[0].toUpperCase()}</div>
-                <div className={styles.contactInfo}>
-                  <div className={styles.contactName}>{user.full_name}</div>
-                  <div className={styles.contactRole}>{user.role}</div>
-                </div>
-                <svg className={styles.chevron} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="9 18 15 12 9 6"/>
-                </svg>
+            {recentChats.length > 0 && !searchQuery && roleFilter === 'all' && (
+              <div className={styles.section}>
+                <h2 className={styles.sectionTitle}>Recent</h2>
+                {recentChats.map(user => (
+                  <div key={user.id} className={`${styles.contactCard} ${styles[`contactCard_${theme}`]}`} onClick={() => openChat(user)}>
+                    <div className={styles.avatar}>{user.full_name[0].toUpperCase()}</div>
+                    <div className={styles.contactInfo}>
+                      <div className={styles.contactName}>{user.full_name}</div>
+                      <div className={styles.contactRole}>{user.role}</div>
+                    </div>
+                    <svg className={styles.chevron} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            )}
 
-        <div className={styles.section}>
-          <h2 className={styles.sectionTitle}>All Contacts</h2>
-          {filteredUsers.length === 0 ? (
-            <EmptyRecord message="No contacts found" onReload={loadUsers} theme={theme} />
-          ) : (
-            filteredUsers.map(user => (
-              <div
-                key={user.id}
-                className={`${styles.contactCard} ${styles[`contactCard_${theme}`]}`}
-                onClick={() => openChat(user)}
-              >
-                <div className={styles.avatar}>{user.full_name[0].toUpperCase()}</div>
-                <div className={styles.contactInfo}>
-                  <div className={styles.contactName}>{user.full_name}</div>
-                  <div className={styles.contactRole}>{user.role}</div>
-                </div>
-                <svg className={styles.chevron} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="9 18 15 12 9 6"/>
-                </svg>
-              </div>
-            ))
-          )}
-        </div>
+            <div className={styles.section}>
+              <h2 className={styles.sectionTitle}>All Contacts</h2>
+              {filteredUsers.length === 0 ? (
+                <EmptyRecord message="No contacts found" onReload={loadUsers} theme={theme} />
+              ) : (
+                filteredUsers.map(user => (
+                  <div key={user.id} className={`${styles.contactCard} ${styles[`contactCard_${theme}`]}`} onClick={() => openChat(user)}>
+                    <div className={styles.avatar}>{user.full_name[0].toUpperCase()}</div>
+                    <div className={styles.contactInfo}>
+                      <div className={styles.contactName}>{user.full_name}</div>
+                      <div className={styles.contactRole}>{user.role}</div>
+                    </div>
+                    <svg className={styles.chevron} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+                  </div>
+                ))
+              )}
+            </div>
           </>
         )}
 
@@ -258,19 +223,13 @@ export default function MessagingPage() {
               <EmptyRecord message="No groups yet" onReload={loadGroups} theme={theme} />
             ) : (
               groups.map(group => (
-                <div
-                  key={group.id}
-                  className={`${styles.contactCard} ${styles[`contactCard_${theme}`]}`}
-                  onClick={() => openGroupChat(group)}
-                >
+                <div key={group.id} className={`${styles.contactCard} ${styles[`contactCard_${theme}`]}`} onClick={() => openGroupChat(group)}>
                   <div className={styles.avatar}>G</div>
                   <div className={styles.contactInfo}>
                     <div className={styles.contactName}>{group.name}</div>
                     <div className={styles.contactRole}>Group Chat</div>
                   </div>
-                  <svg className={styles.chevron} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="9 18 15 12 9 6"/>
-                  </svg>
+                  <svg className={styles.chevron} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
                 </div>
               ))
             )}

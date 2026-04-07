@@ -1,20 +1,22 @@
 .container {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  position: relative;
-  padding-bottom: var(--nav-height);
+  height: 100dvh;
+  overflow: hidden;
   box-sizing: border-box;
 }
 
+@media screen and (min-width: 801px) {
+  .container {
+    height: 100%;
+  }
+}
+
 .header {
-  position: fixed;
-  top: 0;
-  left: var(--sidebar-width);
-  right: 0;
   z-index: 10;
   backdrop-filter: blur(8px);
   box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .header_light {
@@ -40,19 +42,20 @@
   border: none;
   cursor: pointer;
   color: currentColor;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
   padding: 4px;
   margin-left: -8px;
+}
+
+.backButton:hover {
+  background-color: rgba(0, 0, 0, 0.05);
 }
 
 .backIcon {
   width: 20px;
   height: 20px;
-}
-
-.title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin: 0;
 }
 
 .avatar {
@@ -80,13 +83,17 @@
 }
 
 .messagesContainer {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1rem 2rem;
   display: flex;
-  max-width: 900px;
   flex-direction: column;
-  padding: 6rem 2rem 2rem 2rem;
-  width: 100%;
-  box-sizing: border-box;
   gap: 1rem;
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .noMessages {
@@ -144,15 +151,19 @@
 }
 
 .messageForm {
-  position: fixed;
-  bottom: var(--nav-height);
-  left: var(--sidebar-width);
-  right: 0;
   display: flex;
   gap: 0.75rem;
-  padding: 1rem 2rem;
+  padding: 0.75rem 2rem;
+  padding-bottom: calc(var(--nav-height, 70px) + 0.5rem);
   border-top: 1px solid rgba(0, 0, 0, 0.1);
   box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+@media screen and (min-width: 801px) {
+  .messageForm {
+    padding-bottom: 0.75rem;
+  }
 }
 
 .messageForm_light {
@@ -171,7 +182,6 @@
   font-size: 0.9375rem;
   background: transparent;
   color: inherit;
-  box-sizing: border-box;
 }
 
 .messageInput:focus {
@@ -190,33 +200,30 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.2s;
   flex-shrink: 0;
 }
 
-@media screen and (min-width: 500px) and (max-width: 800px) {
-  .header {
-    left: 0;
-  }
+.sendButton:hover {
+  background: #b91c1c;
+}
 
+@media screen and (min-width: 500px) and (max-width: 800px) {
   .headerContent {
     padding: 1rem 1.5rem;
   }
 
   .messagesContainer {
-    padding: 6rem 1.5rem 2rem 1.5rem;
+    padding: 1rem 1.5rem;
   }
 
   .messageForm {
-    left: 0;
-    padding: 1rem 1.5rem;
+    padding: 0.75rem 1.5rem;
+    padding-bottom: calc(var(--nav-height, 70px) - 24px);
   }
 }
 
 @media screen and (max-width: 500px) {
-  .header {
-    left: 0;
-  }
-
   .headerContent {
     padding: 1rem;
   }
@@ -226,12 +233,8 @@
     height: 16px;
   }
 
-  .title {
-    font-size: 1.125rem;
-  }
-
   .messagesContainer {
-    padding: 5rem 1rem 2rem 1rem;
+    padding: 1rem;
   }
 
   .message {
@@ -239,8 +242,8 @@
   }
 
   .messageForm {
-    left: 0;
-    padding: 1rem;
+    padding: 0.75rem 1rem;
+    padding-bottom: calc(var(--nav-height, 70px) - 16px);
   }
 
   .messageInput {

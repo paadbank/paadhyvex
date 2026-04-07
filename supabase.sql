@@ -322,13 +322,15 @@ CREATE POLICY "Admins can create notifications" ON notifications FOR INSERT WITH
 -- MESSAGES POLICIES
 CREATE POLICY "Users can view their messages" ON messages FOR SELECT USING (
   sender_id = auth.uid() OR recipient_id = auth.uid() OR
-  EXISTS (SELECT 1 FROM message_group_members WHERE group_id = messages.group_id AND user_id = auth.uid())
+  (group_id IS NOT NULL AND public.is_group_member(group_id, auth.uid()))
 );
 CREATE POLICY "Users can send messages" ON messages FOR INSERT WITH CHECK (
-  sender_id = auth.uid() AND (recipient_id IS NOT NULL OR EXISTS (SELECT 1 FROM message_group_members WHERE group_id = messages.group_id AND user_id = auth.uid()))
+  sender_id = auth.uid() AND (recipient_id IS NOT NULL OR
+  (group_id IS NOT NULL AND public.is_group_member(group_id, auth.uid())))
 );
 CREATE POLICY "Users can update messages" ON messages FOR UPDATE USING (
-  sender_id = auth.uid() OR recipient_id = auth.uid() OR EXISTS (SELECT 1 FROM message_group_members WHERE group_id = messages.group_id AND user_id = auth.uid())
+  sender_id = auth.uid() OR recipient_id = auth.uid() OR
+  (group_id IS NOT NULL AND public.is_group_member(group_id, auth.uid()))
 );
 
 -- MESSAGE GROUPS POLICIES
@@ -336,7 +338,7 @@ CREATE POLICY "Users can create groups" ON message_groups FOR INSERT WITH CHECK 
 CREATE POLICY "Users can manage own groups" ON message_groups FOR UPDATE USING (created_by = auth.uid());
 CREATE POLICY "Users can delete own groups" ON message_groups FOR DELETE USING (created_by = auth.uid());
 CREATE POLICY "Users can view their groups" ON message_groups FOR SELECT USING (
-  created_by = auth.uid() OR EXISTS (SELECT 1 FROM message_group_members WHERE group_id = message_groups.id AND user_id = auth.uid())
+  created_by = auth.uid() OR public.is_group_member(id, auth.uid())
 );
 
 -- MESSAGE GROUP MEMBERS POLICIES
@@ -344,7 +346,7 @@ CREATE POLICY "Group creators can manage members" ON message_group_members FOR A
   EXISTS (SELECT 1 FROM message_groups WHERE id = message_group_members.group_id AND created_by = auth.uid())
 );
 CREATE POLICY "Members can view group members" ON message_group_members FOR SELECT USING (
-  EXISTS (SELECT 1 FROM message_group_members mgm WHERE mgm.group_id = message_group_members.group_id AND mgm.user_id = auth.uid())
+  public.is_group_member(group_id, auth.uid())
 );
 
 -- ROLE CHANGE LOG POLICIES

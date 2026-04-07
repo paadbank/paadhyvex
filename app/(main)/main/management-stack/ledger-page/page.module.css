@@ -13,47 +13,58 @@
   left: var(--sidebar-width);
   right: 0;
   z-index: 10;
+  display: flex;
   backdrop-filter: blur(8px);
   box-sizing: border-box;
 }
 
 .header_light {
-  background: rgba(255, 255, 255, 0.95);
+  background-color: rgba(255, 255, 255, 0.8);
   border-bottom: 1px solid #C4C4C4;
 }
 
 .header_dark {
-  background: rgba(26, 26, 26, 0.95);
-  border-bottom: 1.5px solid rgba(255, 255, 255, 0.1);
+  background-color: rgba(18, 18, 18, 0.8);
+  border-bottom: 1px solid #333;
 }
 
 .headerContent {
   display: flex;
   align-items: center;
+  width: 100%;
   gap: 1rem;
-  padding: 1.1rem 2rem;
   box-sizing: border-box;
+  min-width: 0;
+  padding: 8px 16px;
 }
 
 .backButton {
+  min-width: 44px;
+  min-height: 44px;
   background: none;
   border: none;
   cursor: pointer;
   color: currentColor;
   border-radius: 50%;
-  padding: 4px;
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  justify-content: center;
   margin-left: -8px;
 }
 
-.backIcon {
-  width: 20px;
-  height: 20px;
-}
+.backButton:hover { background-color: rgba(0, 0, 0, 0.05); }
+.backIcon { width: 20px; height: 20px; }
 
 .title {
   font-size: 1.5rem;
   font-weight: 600;
   margin: 0;
+  flex-grow: 1;
+  text-align: start;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .innerBody {
@@ -160,45 +171,14 @@
   opacity: 0.8;
 }
 
-@media screen and (max-width: 768px) {
-  .summary {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media screen and (min-width: 500px) and (max-width: 800px) {
-  .header {
-    left: 0;
-  }
-
-  .headerContent {
-    padding: 1rem 1.5rem;
-  }
-
-  .innerBody {
-    padding: 6rem 1.5rem 2rem 1.5rem;
-  }
+  .header { left: 0; }
+  .innerBody { padding: 6rem 1.5rem 2rem 1.5rem; }
 }
 
 @media screen and (max-width: 500px) {
-  .header {
-    left: 0;
-  }
-
-  .headerContent {
-    padding: 1rem;
-  }
-
-  .innerBody {
-    padding: 5rem 1rem 2rem 1rem;
-  }
-
-  .backIcon {
-    width: 16px;
-    height: 16px;
-  }
-
-  .title {
-    font-size: 1.2rem;
-  }
+  .header { left: 0; }
+  .innerBody { padding: 5rem 1rem 2rem 1rem; }
+  .backIcon { width: 16px; height: 16px; }
+  .title { font-size: 1.2rem; }
 }

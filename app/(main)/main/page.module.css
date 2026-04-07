@@ -3,7 +3,6 @@
   flex-direction: column;
   overflow: hidden;
   position: relative;
-  height: 100vh;
 }
 
 .mainContainer_light {

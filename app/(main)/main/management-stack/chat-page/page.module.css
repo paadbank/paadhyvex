@@ -4,7 +4,13 @@
   height: 100dvh;
   overflow: hidden;
   box-sizing: border-box;
-  padding-bottom: calc(var(--nav-height) - 32px);
+}
+
+/* On desktop the nav bar is hidden, sidebar takes space — use full height */
+@media screen and (min-width: 801px) {
+  .container {
+    height: 100%;
+  }
 }
 
 .header {
@@ -78,8 +84,10 @@
   text-transform: capitalize;
 }
 
+/* min-height: 0 is critical — without it flex children won't shrink below content size */
 .messagesContainer {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 1rem 2rem;
   display: flex;
@@ -141,10 +149,17 @@
 .messageForm {
   display: flex;
   gap: 0.75rem;
-  padding: 1rem 2rem;
+  padding: 0.75rem 2rem;
+  padding-bottom: calc(var(--nav-height, 70px) + 0.5rem);
   border-top: 1px solid rgba(0, 0, 0, 0.1);
   box-sizing: border-box;
   flex-shrink: 0;
+}
+
+@media screen and (min-width: 801px) {
+  .messageForm {
+    padding-bottom: 0.75rem;
+  }
 }
 
 .messageForm_light {
@@ -199,7 +214,8 @@
   }
 
   .messageForm {
-    padding: 1rem 1.5rem;
+    padding: 0.75rem 1.5rem;
+    padding-bottom: calc(var(--nav-height, 70px) - 24px);
   }
 }
 
@@ -222,7 +238,8 @@
   }
 
   .messageForm {
-    padding: 1rem;
+    padding: 0.75rem 1rem;
+    padding-bottom: calc(var(--nav-height, 70px) - 16px);
   }
 
   .messageInput {

@@ -116,11 +116,18 @@
   border: 1px solid #d1d5db;
   border-radius: 6px;
   font-size: 14px;
+  background: #f9f9f9;
+  color: #1f2937;
 }
 
 .dark .select {
-  background: #4b5563;
-  border-color: #6b7280;
+  background: #1e1e1e;
+  border-color: #555;
+  color: #f5f0e8;
+}
+
+.dark .select option {
+  background: #1e1e1e;
   color: #f5f0e8;
 }
 

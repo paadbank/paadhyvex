@@ -127,6 +127,28 @@
   border-radius: 8px;
   font-size: 1rem;
   box-sizing: border-box;
+  color: inherit;
+}
+
+.form_light .field input,
+.form_light .field select,
+.form_light .field textarea {
+  background: #f9f9f9;
+  color: #2d2d2d;
+  border-color: #d4cfc4;
+}
+
+.form_dark .field input,
+.form_dark .field select,
+.form_dark .field textarea {
+  background: #1e1e1e;
+  color: #f5f0e8;
+  border-color: #555;
+}
+
+.form_dark .field select option {
+  background: #1e1e1e;
+  color: #f5f0e8;
 }
 
 .submitButton {

@@ -8,6 +8,118 @@ import { supabaseBrowser } from '@/lib/supabase/client';
 import SideDrawer from '@/lib/SideDrawer';
 import styles from './page.module.css';
 
+type Story = { id: string; title: string; location: string; story_text: string; media_url: string; media_type: 'image' | 'video'; category: string; };
+
+function getFileId(url: string) {
+  const m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  return m ? m[1] : null;
+}
+function getThumb(url: string) {
+  const id = getFileId(url);
+  return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w600` : url;
+}
+function getEmbed(url: string) {
+  const id = getFileId(url);
+  return id ? `https://drive.google.com/file/d/${id}/preview` : url;
+}
+
+// Featured video reel — shows the first published video after the mission section
+function VideoReel({ theme }: { theme: string }) {
+  const [video, setVideo] = useState<Story | null>(null);
+  useEffect(() => {
+    supabaseBrowser
+      .from('stories')
+      .select('id,title,location,story_text,media_url,media_type,category')
+      .eq('is_published', true)
+      .eq('media_type', 'video')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .then(({ data }) => setVideo(data?.[0] || null));
+  }, []);
+  if (!video) return null;
+  return (
+    <section className={styles.videoReel}>
+      <div className={styles.videoReelInner}>
+        <div className={styles.videoReelText}>
+          <span className={styles.videoReelBadge}>📹 From the Field</span>
+          <h2 className={styles.videoReelTitle}>{video.title}</h2>
+          {video.location && <p className={styles.videoReelLocation}>📍 {video.location}</p>}
+          <p className={styles.videoReelExcerpt}>
+            {video.story_text.length > 160 ? video.story_text.slice(0, 160) + '…' : video.story_text}
+          </p>
+          <a href="/stories" className={styles.videoReelLink}>See all stories →</a>
+        </div>
+        <div className={styles.videoReelFrame}>
+          <iframe
+            src={getEmbed(video.media_url)}
+            allow="autoplay; fullscreen"
+            allowFullScreen
+            title={video.title}
+            className={styles.videoReelIframe}
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function StoriesPreview({ theme, router }: { theme: string; router: { push: (href: string) => void } }) {
+  const [stories, setStories] = useState<Story[]>([]);
+  useEffect(() => {
+    supabaseBrowser
+      .from('stories')
+      .select('id,title,location,story_text,media_url,media_type,category')
+      .eq('is_published', true)
+      .order('created_at', { ascending: false })
+      .limit(4)
+      .then(({ data }) => setStories(data || []));
+  }, []);
+  if (stories.length === 0) return null;
+  return (
+    <section className={styles.storiesPreview}>
+      <div className={styles.storiesPreviewHeader}>
+        <div>
+          <h2 className={styles.sectionTitle} style={{ marginBottom: '0.5rem' }}>Stories from the Field</h2>
+          <p className={styles.text} style={{ margin: 0 }}>Real moments from schools and communities we serve.</p>
+        </div>
+        <a href="/stories" className={styles.storiesViewAll}>View all →</a>
+      </div>
+      <div className={styles.storiesGrid}>
+        {stories.map((s, i) => (
+          <div
+            key={s.id}
+            className={`${styles.storyCard} ${styles[`storyCard_${theme}`]} ${i === 0 ? styles.storyCardFeatured : ''}`}
+            onClick={() => router.push('/stories')}
+          >
+            <div className={styles.storyMedia}>
+              {s.media_type === 'video' ? (
+                <div className={styles.storyVideoThumb}>
+                  <div className={styles.storyPlayBtn}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                  </div>
+                </div>
+              ) : (
+                <img src={getThumb(s.media_url)} alt={s.title} className={styles.storyImg} loading="lazy" />
+              )}
+              <div className={styles.storyOverlay}>
+                {s.category && <span className={styles.storyTag}>{s.category}</span>}
+              </div>
+            </div>
+            <div className={styles.storyBody}>
+              <h3 className={styles.storyTitle}>{s.title}</h3>
+              {s.location && <p className={styles.storyLocation}>📍 {s.location}</p>}
+              <p className={styles.storyExcerpt}>{s.story_text.length > 80 ? s.story_text.slice(0, 80) + '…' : s.story_text}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className={styles.storiesViewAllMobile}>
+        <button onClick={() => router.push('/stories')} className={styles.secondaryBtn}>View All Stories</button>
+      </div>
+    </section>
+  );
+}
+
 export default function LandingPage() {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
@@ -52,6 +164,7 @@ export default function LandingPage() {
           </div>
           <div className={styles.navLinks}>
             <a href="/about">{t('about_text') || 'About'}</a>
+            <a href="/stories">Stories</a>
             <a href="/privacy">{t('privacy_policy') || 'Privacy'}</a>
             <a href="/terms">{t('terms_of_service') || 'Terms'}</a>
           </div>
@@ -101,6 +214,7 @@ export default function LandingPage() {
           </div>
           <div className={styles.drawerContent}>
             <a href="/about" className={styles.drawerLink}>{t('about_text') || 'About'}</a>
+            <a href="/stories" className={styles.drawerLink}>Stories</a>
             <a href="/privacy" className={styles.drawerLink}>{t('privacy_policy') || 'Privacy'}</a>
             <a href="/terms" className={styles.drawerLink}>{t('terms_of_service') || 'Terms'}</a>
             <div className={styles.drawerDivider}></div>
@@ -130,6 +244,8 @@ export default function LandingPage() {
             </button>
           </div>
         </section>
+
+        <VideoReel theme={theme} />
 
         <section className={styles.mission}>
           <h2 className={styles.sectionTitle}>Our Mission</h2>
@@ -201,6 +317,8 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
+
+        <StoriesPreview theme={theme} router={router} />
 
         <section className={styles.cta}>
           <h2 className={styles.ctaTitle}>Join PAADhyvex Today</h2>

@@ -364,3 +364,40 @@ CREATE POLICY "System can insert audit log" ON audit_log FOR INSERT WITH CHECK (
 CREATE POLICY "Admins can manage profile codes" ON profile_codes FOR ALL USING (
   public.get_user_role() IN ('admin', 'manager')
 );
+
+-- STORIES TABLE
+DROP TABLE IF EXISTS stories CASCADE;
+
+CREATE TABLE stories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title VARCHAR(255) NOT NULL,
+  location VARCHAR(255),
+  story_text TEXT NOT NULL,
+  media_url TEXT NOT NULL,
+  media_type VARCHAR(10) NOT NULL CHECK (media_type IN ('image', 'video')),
+  category VARCHAR(100),
+  is_published BOOLEAN DEFAULT TRUE,
+  created_by UUID REFERENCES profiles(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_stories_is_published ON stories(is_published);
+CREATE INDEX idx_stories_created_at ON stories(created_at);
+
+CREATE TRIGGER update_stories_updated_at BEFORE UPDATE ON stories
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+ALTER TABLE stories ENABLE ROW LEVEL SECURITY;
+
+-- Public can read published stories (no auth required for landing page)
+CREATE POLICY "Anyone can view published stories" ON stories
+  FOR SELECT USING (is_published = true);
+
+-- Authenticated users with admin/manager role can read all
+CREATE POLICY "Admins can view all stories" ON stories
+  FOR SELECT USING (public.get_user_role() IN ('admin', 'manager'));
+
+-- Admins and managers can insert/update/delete
+CREATE POLICY "Admins can manage stories" ON stories
+  FOR ALL USING (public.get_user_role() IN ('admin', 'manager'));

@@ -105,8 +105,18 @@
   border: 1px solid #d4cfc4;
   border-radius: 8px;
   font-size: 1rem;
-  background: transparent;
   color: inherit;
+}
+
+.card_light .input {
+  background: #f9f9f9;
+  color: #2d2d2d;
+}
+
+.card_dark .input {
+  background: #1e1e1e;
+  color: #f5f0e8;
+  border-color: #555;
 }
 
 .input:focus {

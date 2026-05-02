@@ -13,6 +13,7 @@ import GroupChatPage from './group-chat-page/page';
 import LogCyclePage from './log-cycle-page/page';
 import TransactionsPage from './transactions-page/page';
 import LedgerPage from './ledger-page/page';
+import StoriesPage from './stories-page/page';
 
 const managementStackNavLink = {
   management_home: ManagementHome,
@@ -27,6 +28,7 @@ const managementStackNavLink = {
   log_cycle_page: LogCyclePage,
   transactions_page: TransactionsPage,
   ledger_page: LedgerPage,
+  stories_page: StoriesPage,
 };
 
 export const ManagementStack = () => (

@@ -51,6 +51,12 @@ export default function ManagementHome() {
 
           {isAdmin && (
             <>
+              <div className={`${styles.card} ${styles[`card_${theme}`]}`} onClick={() => nav.push('stories_page')}>
+                <span className={styles.icon}>📸</span>
+                <h3>Stories</h3>
+                <p>Manage field photos, videos and stories</p>
+              </div>
+
               <div className={`${styles.card} ${styles[`card_${theme}`]}`} onClick={() => nav.push('expenses_page')}>
                 <span className={styles.icon}>💰</span>
                 <h3>{t('expenses') || 'Expenses'}</h3>

@@ -942,3 +942,117 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+
+/* Founder Story Preview Section */
+.founderPreview {
+  margin: 0 calc(-2rem);
+  padding: 3rem 2rem;
+}
+
+.founderPreview_light {
+  background: linear-gradient(135deg, rgba(220,38,38,0.06) 0%, rgba(248,113,113,0.04) 100%);
+  border-top: 1px solid rgba(220,38,38,0.12);
+  border-bottom: 1px solid rgba(220,38,38,0.12);
+}
+
+.founderPreview_dark {
+  background: linear-gradient(135deg, rgba(220,38,38,0.1) 0%, rgba(248,113,113,0.06) 100%);
+  border-top: 1px solid rgba(220,38,38,0.2);
+  border-bottom: 1px solid rgba(220,38,38,0.2);
+}
+
+.founderPreviewInner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+@media (min-width: 800px) {
+  .founderPreviewInner { flex-direction: row; gap: 3rem; align-items: flex-start; }
+}
+
+.founderPreviewLeft {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+@media (min-width: 800px) {
+  .founderPreviewLeft { flex-direction: column; align-items: flex-start; min-width: 200px; }
+}
+
+.founderPreviewAvatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #dc2626;
+  flex-shrink: 0;
+}
+
+.founderPreviewBadge {
+  display: inline-block;
+  padding: 0.2rem 0.7rem;
+  border-radius: 2rem;
+  background: rgba(220,38,38,0.12);
+  color: #dc2626;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.4rem;
+}
+
+.founderPreviewTitle {
+  font-size: clamp(1.1rem, 2.5vw, 1.35rem);
+  font-weight: 800;
+  margin: 0 0 0.25rem;
+  line-height: 1.3;
+}
+
+.founderPreviewMeta {
+  font-size: 0.82rem;
+  opacity: 0.55;
+  margin: 0;
+}
+
+.founderPreviewBody { flex: 1; }
+
+.founderPreviewText {
+  font-size: 0.95rem;
+  line-height: 1.8;
+  opacity: 0.85;
+  margin: 0 0 1rem;
+  white-space: pre-wrap;
+}
+
+.founderPreviewActions {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.founderPreviewToggle {
+  background: none;
+  border: none;
+  color: #dc2626;
+  font-weight: 700;
+  font-size: 0.875rem;
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 0.2s;
+}
+.founderPreviewToggle:hover { opacity: 0.7; }
+
+.founderPreviewLink {
+  color: #dc2626;
+  font-weight: 700;
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+.founderPreviewLink:hover { opacity: 0.7; }

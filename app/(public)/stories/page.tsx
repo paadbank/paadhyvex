@@ -17,6 +17,15 @@ type Story = {
   created_at: string;
 };
 
+type FounderStory = {
+  id: string;
+  title: string;
+  description: string;
+  founder_name: string;
+  founder_date: string;
+  image_url: string;
+};
+
 function getFileId(url: string) {
   const m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
   return m ? m[1] : null;
@@ -24,7 +33,7 @@ function getFileId(url: string) {
 
 function getImageUrl(url: string) {
   const id = getFileId(url);
-  return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w800` : url;
+  return id ? `https://lh3.googleusercontent.com/d/${id}` : url;
 }
 
 function getEmbedUrl(url: string) {
@@ -40,6 +49,8 @@ export default function StoriesPage() {
   const [filter, setFilter] = useState('all');
   const [selected, setSelected] = useState<Story | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [founder, setFounder] = useState<FounderStory | null>(null);
+  const [founderExpanded, setFounderExpanded] = useState(false);
 
   useEffect(() => {
     supabaseBrowser
@@ -48,6 +59,12 @@ export default function StoriesPage() {
       .eq('is_published', true)
       .order('created_at', { ascending: false })
       .then(({ data }) => { setStories(data || []); setLoading(false); });
+    supabaseBrowser
+      .from('founder_story')
+      .select('*')
+      .limit(1)
+      .single()
+      .then(({ data }) => setFounder(data || null));
   }, []);
 
   const filtered = filter === 'all' ? stories : stories.filter(s => s.category === filter);
@@ -101,6 +118,45 @@ export default function StoriesPage() {
           Real moments from schools, communities, and interviews — the faces behind our mission.
         </p>
       </div>
+
+      {/* Founder Story Banner */}
+      {founder && (
+        <div className={`${styles.founderBanner} ${styles[`founderBanner_${theme}`]}`}>
+          <div className={styles.founderBannerInner}>
+            <div className={styles.founderBannerLeft}>
+              {founder.image_url && (
+                <img
+                  src={founder.image_url.match(/\/d\/([a-zA-Z0-9_-]+)/)
+                    ? `https://lh3.googleusercontent.com/d/${getFileId(founder.image_url)}`
+                    : founder.image_url}
+                  alt={founder.founder_name}
+                  className={styles.founderBannerAvatar}
+                />
+              )}
+              <div>
+                <span className={styles.founderBannerBadge}>✦ Founder's Story</span>
+                <h2 className={styles.founderBannerTitle}>{founder.title}</h2>
+                <p className={styles.founderBannerMeta}>{founder.founder_name}{founder.founder_date ? ` · ${founder.founder_date}` : ''}</p>
+              </div>
+            </div>
+            <div className={styles.founderBannerBody}>
+              <p className={styles.founderBannerText}>
+                {founderExpanded
+                  ? founder.description
+                  : founder.description.slice(0, 320) + (founder.description.length > 320 ? '…' : '')}
+              </p>
+              {founder.description.length > 320 && (
+                <button
+                  className={styles.founderBannerToggle}
+                  onClick={() => setFounderExpanded(v => !v)}
+                >
+                  {founderExpanded ? 'Show less ↑' : 'Read full story ↓'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {categories.length > 1 && (
         <div className={styles.filtersWrap}>

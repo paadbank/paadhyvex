@@ -16,7 +16,7 @@ function getFileId(url: string) {
 }
 function getThumb(url: string) {
   const id = getFileId(url);
-  return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w600` : url;
+  return id ? `https://lh3.googleusercontent.com/d/${id}` : url;
 }
 function getEmbed(url: string) {
   const id = getFileId(url);
@@ -65,6 +65,7 @@ function VideoReel({ theme }: { theme: string }) {
 
 function StoriesPreview({ theme, router }: { theme: string; router: { push: (href: string) => void } }) {
   const [stories, setStories] = useState<Story[]>([]);
+  const [founderTitle, setFounderTitle] = useState('');
   useEffect(() => {
     supabaseBrowser
       .from('stories')
@@ -73,13 +74,19 @@ function StoriesPreview({ theme, router }: { theme: string; router: { push: (hre
       .order('created_at', { ascending: false })
       .limit(4)
       .then(({ data }) => setStories(data || []));
+    supabaseBrowser
+      .from('founder_story')
+      .select('title')
+      .limit(1)
+      .single()
+      .then(({ data }) => setFounderTitle(data?.title || 'Stories from the Field'));
   }, []);
   if (stories.length === 0) return null;
   return (
     <section className={styles.storiesPreview}>
       <div className={styles.storiesPreviewHeader}>
         <div>
-          <h2 className={styles.sectionTitle} style={{ marginBottom: '0.5rem' }}>Stories from the Field</h2>
+          <h2 className={styles.sectionTitle} style={{ marginBottom: '0.5rem' }}>{founderTitle}</h2>
           <p className={styles.text} style={{ margin: 0 }}>Real moments from schools and communities we serve.</p>
         </div>
         <a href="/stories" className={styles.storiesViewAll}>View all →</a>
@@ -115,6 +122,51 @@ function StoriesPreview({ theme, router }: { theme: string; router: { push: (hre
       </div>
       <div className={styles.storiesViewAllMobile}>
         <button onClick={() => router.push('/stories')} className={styles.secondaryBtn}>View All Stories</button>
+      </div>
+    </section>
+  );
+}
+
+function FounderStoryPreview({ theme, router }: { theme: string; router: { push: (href: string) => void } }) {
+  const [founder, setFounder] = useState<{ title: string; description: string; founder_name: string; founder_date: string; image_url: string } | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => {
+    supabaseBrowser.from('founder_story').select('*').limit(1).single()
+      .then(({ data }) => setFounder(data || null));
+  }, []);
+  if (!founder) return null;
+  const imgId = getFileId(founder.image_url);
+  const imgSrc = imgId ? `https://lh3.googleusercontent.com/d/${imgId}` : founder.image_url;
+  const preview = founder.description.slice(0, 300);
+  const hasMore = founder.description.length > 300;
+  return (
+    <section className={`${styles.founderPreview} ${styles[`founderPreview_${theme}`]}`}>
+      <div className={styles.founderPreviewInner}>
+        <div className={styles.founderPreviewLeft}>
+          {founder.image_url && (
+            <img src={imgSrc} alt={founder.founder_name} className={styles.founderPreviewAvatar} />
+          )}
+          <div>
+            <span className={styles.founderPreviewBadge}>✦ Founder&apos;s Story</span>
+            <h2 className={styles.founderPreviewTitle}>{founder.title}</h2>
+            <p className={styles.founderPreviewMeta}>
+              {founder.founder_name}{founder.founder_date ? ` · ${founder.founder_date}` : ''}
+            </p>
+          </div>
+        </div>
+        <div className={styles.founderPreviewBody}>
+          <p className={styles.founderPreviewText}>
+            {expanded ? founder.description : preview + (hasMore ? '…' : '')}
+          </p>
+          <div className={styles.founderPreviewActions}>
+            {hasMore && (
+              <button className={styles.founderPreviewToggle} onClick={() => setExpanded(v => !v)}>
+                {expanded ? 'Show less ↑' : 'Read full story ↓'}
+              </button>
+            )}
+            <a href="/stories" className={styles.founderPreviewLink}>See all stories →</a>
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -231,53 +283,60 @@ export default function LandingPage() {
       <main className={styles.main}>
         <section className={styles.hero}>
           <h1 className={styles.heroTitle}>PAADhyvex</h1>
-          <p className={styles.heroSubtitle}>Pad Access and Advocacy for Dignity Bank</p>
+          <p className={styles.heroSubtitle}>Protection. Access. Awareness. Dignity. Hygiene. Value. Empowerment. eXpression.</p>
           <p className={styles.heroDescription}>
-            Empowering menstrual health through accessible pad distribution, cycle tracking, and comprehensive support services.
+            One pad at a time — restoring dignity and changing lives across schools and communities in Sabogida Ora and beyond.
           </p>
           <div className={styles.heroCta}>
             <button onClick={() => router.push('/signup')} className={styles.primaryBtn}>
               Get Started
             </button>
             <button onClick={() => router.push('/about')} className={styles.secondaryBtn}>
-              Learn More
+              Our Story
             </button>
           </div>
         </section>
 
         <VideoReel theme={theme} />
 
+        <FounderStoryPreview theme={theme} router={router} />
+
         <section className={styles.mission}>
           <h2 className={styles.sectionTitle}>Our Mission</h2>
           <p className={styles.text}>
-            PAADhyvex is dedicated to breaking down barriers to menstrual health by providing free or subsidized sanitary pads, 
-            education, and support to individuals who need them most. We believe that access to menstrual products is a basic human right, 
-            not a luxury.
+            We believe access to menstrual products is a basic human right, not a luxury.
+            PAADHYVEX exists to ensure that no girl misses school, no woman is left without support,
+            and no person has to choose between dignity and survival.
+          </p>
+          <p className={styles.text} style={{ marginTop: '1rem' }}>
+            Through free pad distribution, cycle tracking, community outreach, and a growing network
+            of distributors, we are building a future where menstrual health is accessible to all —
+            regardless of income, location, or circumstance.
           </p>
         </section>
 
         <section className={styles.features}>
-          <h2 className={styles.sectionTitle}>What We Offer</h2>
+          <h2 className={styles.sectionTitle}>What We Do</h2>
           <div className={styles.featureGrid}>
+            <div className={styles.feature}>
+              <div className={styles.featureIcon}>🩺</div>
+              <h3>Free Pad Distribution</h3>
+              <p>We reach schools, communities, and individuals who cannot afford sanitary pads — delivering dignity directly to those who need it most.</p>
+            </div>
             <div className={styles.feature}>
               <div className={styles.featureIcon}>📅</div>
               <h3>Cycle Tracking</h3>
-              <p>Track your menstrual cycle with our intuitive calendar system. Log period details, flow intensity, and receive predictions for your next cycle.</p>
+              <p>Beneficiaries can log and track their menstrual cycles, receive predictions, and monitor their health with a simple, private calendar.</p>
             </div>
             <div className={styles.feature}>
-              <div className={styles.featureIcon}>📦</div>
-              <h3>Pad Distribution</h3>
-              <p>Access free or subsidized sanitary pads through our distribution network. Choose pickup or delivery options based on your needs.</p>
+              <div className={styles.featureIcon}>🚚</div>
+              <h3>Distribution Network</h3>
+              <p>A managed network of distributors ensures pads reach the right people — through pickup or direct delivery to homes and schools.</p>
             </div>
             <div className={styles.feature}>
               <div className={styles.featureIcon}>💬</div>
-              <h3>Support & Messaging</h3>
-              <p>Connect with distributors, admins, and other beneficiaries. Get support, ask questions, and share experiences in a safe environment.</p>
-            </div>
-            <div className={styles.feature}>
-              <div className={styles.featureIcon}>📊</div>
-              <h3>Health Insights</h3>
-              <p>View your cycle statistics, average duration, and patterns. Make informed decisions about your menstrual health.</p>
+              <h3>Support & Community</h3>
+              <p>A safe space to connect with distributors and admins, ask questions, and share experiences without shame or stigma.</p>
             </div>
           </div>
         </section>
@@ -286,34 +345,34 @@ export default function LandingPage() {
           <h2 className={styles.sectionTitle}>Who We Serve</h2>
           <div className={styles.roleGrid}>
             <div className={styles.roleCard}>
-              <h3>👥 Beneficiaries</h3>
-              <p>Individuals receiving pad allocations, tracking their cycles, and accessing support services.</p>
+              <h3>🎓 Students & Girls</h3>
+              <p>Female students who miss school or struggle in silence because of their period. Every girl deserves to learn without shame.</p>
             </div>
             <div className={styles.roleCard}>
-              <h3>🚚 Distributors</h3>
-              <p>Community members managing pad distribution, deliveries, and supporting beneficiaries.</p>
+              <h3>👩 Women in the Community</h3>
+              <p>Women in developing communities like Sabogida Ora where access to basic menstrual products is still a daily challenge.</p>
             </div>
             <div className={styles.roleCard}>
-              <h3>👨‍💼 Administrators</h3>
-              <p>Program managers overseeing operations, expenses, and ensuring smooth service delivery.</p>
+              <h3>🤝 Partners & Sponsors</h3>
+              <p>NGOs, individuals, and organisations who believe dignity is not a privilege. Your support funds outreaches and changes lives.</p>
             </div>
           </div>
         </section>
 
         <section className={styles.impact}>
-          <h2 className={styles.sectionTitle}>Our Impact</h2>
+          <h2 className={styles.sectionTitle}>Our Impact So Far</h2>
           <div className={styles.impactGrid}>
             <div className={styles.impactCard}>
-              <div className={styles.impactNumber}>{stats.beneficiaries.toLocaleString()}+</div>
-              <div className={styles.impactLabel}>Beneficiaries Served</div>
+              <div className={styles.impactNumber}>116+</div>
+              <div className={styles.impactLabel}>Pads Distributed in March</div>
             </div>
             <div className={styles.impactCard}>
-              <div className={styles.impactNumber}>{stats.padsDistributed >= 1000 ? `${(stats.padsDistributed / 1000).toFixed(1)}K+` : `${stats.padsDistributed}+`}</div>
-              <div className={styles.impactLabel}>Pads Distributed</div>
+              <div className={styles.impactNumber}>4+</div>
+              <div className={styles.impactLabel}>Schools & Communities Reached</div>
             </div>
             <div className={styles.impactCard}>
-              <div className={styles.impactNumber}>{stats.satisfactionRate}%</div>
-              <div className={styles.impactLabel}>Satisfaction Rate</div>
+              <div className={styles.impactNumber}>{stats.padsDistributed > 116 ? (stats.padsDistributed >= 1000 ? `${(stats.padsDistributed / 1000).toFixed(1)}K+` : `${stats.padsDistributed}+`) : '116+'}</div>
+              <div className={styles.impactLabel}>Total Pads Distributed</div>
             </div>
           </div>
         </section>
@@ -321,14 +380,19 @@ export default function LandingPage() {
         <StoriesPreview theme={theme} router={router} />
 
         <section className={styles.cta}>
-          <h2 className={styles.ctaTitle}>Join PAADhyvex Today</h2>
+          <h2 className={styles.ctaTitle}>Be Part of the Change</h2>
           <p className={styles.ctaText}>
-            Whether you need support or want to help others, PAADhyvex welcomes you. 
-            Sign up now to access our services or become a distributor in your community.
+            If this much impact can be made with limited resources, imagine what is possible with your support.
+            Partner with us. Sponsor a girl. Fund an outreach. Together, we can rewrite more stories — one pad at a time.
           </p>
-          <button onClick={() => router.push('/signup')} className={styles.ctaButton}>
-            Create Your Account
-          </button>
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button onClick={() => router.push('/signup')} className={styles.ctaButton}>
+              Join PAADHYVEX
+            </button>
+            <a href="/stories" className={styles.secondaryBtn} style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
+              Read Our Stories
+            </a>
+          </div>
         </section>
       </main>
 
@@ -336,19 +400,22 @@ export default function LandingPage() {
         <div className={styles.footerContent}>
           <div className={styles.footerSection}>
             <h4>PAADhyvex</h4>
-            <p>Pad Access and Advocacy for Dignity</p>
-            <p>Breaking barriers to menstrual health</p>
+            <p>Protection. Access. Awareness. Dignity.</p>
+            <p>Hygiene. Value. Empowerment. eXpression.</p>
+            <p style={{ marginTop: '0.5rem', fontStyle: 'italic', opacity: 0.7 }}>One pad at a time.</p>
           </div>
           <div className={styles.footerSection}>
             <h4>Quick Links</h4>
             <a href="/about">{t('about_text') || 'About'}</a>
+            <a href="/stories">Stories</a>
             <a href="/privacy">{t('privacy_policy') || 'Privacy Policy'}</a>
             <a href="/terms">{t('terms_of_service') || 'Terms of Service'}</a>
           </div>
           <div className={styles.footerSection}>
-            <h4>Contact</h4>
-            <p>Email: support@paadhyvex.org</p>
-            <p>Available 24/7 for support</p>
+            <h4>Get Involved</h4>
+            <p>Partner with us. Sponsor a girl.</p>
+            <p>Fund an outreach. Amplify this mission.</p>
+            <p style={{ marginTop: '0.5rem' }}>📧 support@paadhyvex.org</p>
           </div>
         </div>
         <div className={styles.footerBottom}>

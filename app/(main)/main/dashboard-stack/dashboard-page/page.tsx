@@ -11,7 +11,7 @@ type Story = { id: string; title: string; location: string; story_text: string; 
 
 function getThumb(url: string) {
   const m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-  return m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400` : url;
+  return m ? `https://lh3.googleusercontent.com/d/${m[1]}` : url;
 }
 
 export default function DashboardPage() {
@@ -114,6 +114,7 @@ export default function DashboardPage() {
 
   const router = useRouter();
   const [stories, setStories] = useState<Story[]>([]);
+  const [founderTitle, setFounderTitle] = useState('Featured Stories');
 
   useEffect(() => {
     supabaseBrowser
@@ -123,6 +124,12 @@ export default function DashboardPage() {
       .order('created_at', { ascending: false })
       .limit(4)
       .then(({ data }) => setStories(data || []));
+    supabaseBrowser
+      .from('founder_story')
+      .select('title')
+      .limit(1)
+      .single()
+      .then(({ data }) => { if (data?.title) setFounderTitle(data.title); });
   }, []);
 
   if (loading) return <LoadingSpinner />;
@@ -262,7 +269,7 @@ export default function DashboardPage() {
         {stories.length > 0 && (
           <section className={styles.storiesSection}>
             <div className={styles.storiesHeader}>
-              <h2 className={styles.storiesTitle}>📸 Featured Stories</h2>
+              <h2 className={styles.storiesTitle}>📸 {founderTitle}</h2>
               <button onClick={() => router.push('/stories')} className={styles.viewAllBtn}>View all →</button>
             </div>
             <div className={styles.storiesStrip}>

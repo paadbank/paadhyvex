@@ -75,7 +75,7 @@ export default function PrivacyPage() {
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>Contact Us</h2>
           <p className={styles.text}>
-            If you have questions about this Privacy Policy, please contact us at support@paadbank.org
+            If you have questions about this Privacy Policy, please contact us at support@paadhyvex.org
           </p>
         </div>
 

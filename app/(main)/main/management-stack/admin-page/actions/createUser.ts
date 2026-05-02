@@ -32,7 +32,7 @@ export async function createUserWithId(userData: {
   const beneficiaryCode = generateBeneficiaryCode();
 
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
-    email: `${beneficiaryCode.toLowerCase()}@paadbank.local`,
+    email: `${beneficiaryCode.toLowerCase()}@paadhyvex.local`,
     password: userData.password,
     email_confirm: true,
     user_metadata: {

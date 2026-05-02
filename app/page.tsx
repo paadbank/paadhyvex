@@ -48,7 +48,7 @@ export default function LandingPage() {
         <div className={styles.navContent}>
           <div className={styles.logo}>
             <span className={styles.logoIcon}>🩸</span>
-            <span className={styles.logoText}>PAAD Bank</span>
+            <span className={styles.logoText}>PAADhyvex</span>
           </div>
           <div className={styles.navLinks}>
             <a href="/about">{t('about_text') || 'About'}</a>
@@ -90,7 +90,7 @@ export default function LandingPage() {
           <div className={styles.drawerHeader}>
             <div className={styles.drawerLogo}>
               <span className={styles.logoIcon}>🩸</span>
-              <span>PAAD Bank</span>
+              <span>PAADhyvex</span>
             </div>
             <button onClick={() => setIsMenuOpen(false)} className={styles.closeBtn}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -116,7 +116,7 @@ export default function LandingPage() {
 
       <main className={styles.main}>
         <section className={styles.hero}>
-          <h1 className={styles.heroTitle}>PAAD Bank</h1>
+          <h1 className={styles.heroTitle}>PAADhyvex</h1>
           <p className={styles.heroSubtitle}>Pad Access and Advocacy for Dignity Bank</p>
           <p className={styles.heroDescription}>
             Empowering menstrual health through accessible pad distribution, cycle tracking, and comprehensive support services.
@@ -134,7 +134,7 @@ export default function LandingPage() {
         <section className={styles.mission}>
           <h2 className={styles.sectionTitle}>Our Mission</h2>
           <p className={styles.text}>
-            PAAD Bank is dedicated to breaking down barriers to menstrual health by providing free or subsidized sanitary pads, 
+            PAADhyvex is dedicated to breaking down barriers to menstrual health by providing free or subsidized sanitary pads, 
             education, and support to individuals who need them most. We believe that access to menstrual products is a basic human right, 
             not a luxury.
           </p>
@@ -203,9 +203,9 @@ export default function LandingPage() {
         </section>
 
         <section className={styles.cta}>
-          <h2 className={styles.ctaTitle}>Join PAAD Bank Today</h2>
+          <h2 className={styles.ctaTitle}>Join PAADhyvex Today</h2>
           <p className={styles.ctaText}>
-            Whether you need support or want to help others, PAAD Bank welcomes you. 
+            Whether you need support or want to help others, PAADhyvex welcomes you. 
             Sign up now to access our services or become a distributor in your community.
           </p>
           <button onClick={() => router.push('/signup')} className={styles.ctaButton}>
@@ -217,7 +217,7 @@ export default function LandingPage() {
       <footer className={styles.footer}>
         <div className={styles.footerContent}>
           <div className={styles.footerSection}>
-            <h4>PAAD Bank</h4>
+            <h4>PAADhyvex</h4>
             <p>Pad Access and Advocacy for Dignity</p>
             <p>Breaking barriers to menstrual health</p>
           </div>
@@ -229,12 +229,12 @@ export default function LandingPage() {
           </div>
           <div className={styles.footerSection}>
             <h4>Contact</h4>
-            <p>Email: support@paadbank.org</p>
+            <p>Email: support@paadhyvex.org</p>
             <p>Available 24/7 for support</p>
           </div>
         </div>
         <div className={styles.footerBottom}>
-          <p>© 2025 PAAD Bank. All rights reserved.</p>
+          <p>© 2025 PAADhyvex. All rights reserved.</p>
         </div>
       </footer>
     </div>

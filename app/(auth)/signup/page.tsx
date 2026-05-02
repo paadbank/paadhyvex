@@ -45,7 +45,7 @@ export default function SignupPage() {
           throw new Error('Invalid profile code');
         }
 
-        if (existingProfile.email && !existingProfile.email.includes('@paadbank.local')) {
+        if (existingProfile.email && !existingProfile.email.includes('@paadhyvex.local')) {
           throw new Error('This profile is already linked to an email');
         }
 

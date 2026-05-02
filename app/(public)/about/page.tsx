@@ -20,7 +20,7 @@ export default function AboutPage() {
       </nav>
 
       <div className={styles.hero}>
-        <h1 className={styles.title}>About PAAD Bank</h1>
+        <h1 className={styles.title}>About PAADhyvex</h1>
         <p className={styles.subtitle}>Pad Access and Advocacy for Dignity</p>
       </div>
 
@@ -28,7 +28,7 @@ export default function AboutPage() {
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>Our Mission</h2>
           <p className={styles.text}>
-            PAAD Bank is dedicated to breaking down barriers to menstrual health by providing free or subsidized sanitary pads, 
+            PAADhyvex is dedicated to breaking down barriers to menstrual health by providing free or subsidized sanitary pads, 
             education, and support to individuals who need them most. We believe that access to menstrual products is a basic human right, 
             not a luxury.
           </p>
@@ -64,7 +64,7 @@ export default function AboutPage() {
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>Get Involved</h2>
           <p className={styles.text}>
-            Whether you need support or want to help others, PAAD Bank welcomes you. Sign up as a beneficiary to receive 
+            Whether you need support or want to help others, PAADhyvex welcomes you. Sign up as a beneficiary to receive 
             pad allocations and track your cycle, or become a distributor to help deliver products to your community.
           </p>
         </div>

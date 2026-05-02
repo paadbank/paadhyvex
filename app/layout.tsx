@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PAAD Bank",
+  title: "PAADhyvex",
   description: "Menstrual Health Management Platform",
 };
 

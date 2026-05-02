@@ -21,14 +21,14 @@ export default function TermsPage() {
 
       <div className={styles.hero}>
         <h1 className={styles.title}>Terms of Service</h1>
-        <p className={styles.subtitle}>Guidelines for using PAAD Bank</p>
+        <p className={styles.subtitle}>Guidelines for using PAADhyvex</p>
       </div>
 
       <div className={styles.content}>
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>Acceptance of Terms</h2>
           <p className={styles.text}>
-            By accessing and using PAAD Bank, you accept and agree to be bound by these Terms of Service. 
+            By accessing and using PAADhyvex, you accept and agree to be bound by these Terms of Service. 
             If you do not agree to these terms, please do not use our services.
           </p>
         </div>
@@ -36,7 +36,7 @@ export default function TermsPage() {
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>Eligibility</h2>
           <p className={styles.text}>
-            You must be at least 13 years old to use PAAD Bank. By using our services, you represent that you meet this requirement.
+            You must be at least 13 years old to use PAADhyvex. By using our services, you represent that you meet this requirement.
           </p>
         </div>
 
@@ -53,7 +53,7 @@ export default function TermsPage() {
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>Service Usage</h2>
           <p className={styles.text}>
-            PAAD Bank provides menstrual health management services including:
+            PAADhyvex provides menstrual health management services including:
           </p>
           <ul className={styles.list}>
             <li className={styles.listItem}>Pad distribution and allocation</li>
@@ -86,7 +86,7 @@ export default function TermsPage() {
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>Limitation of Liability</h2>
           <p className={styles.text}>
-            PAAD Bank is provided "as is" without warranties. We are not liable for any damages arising from your use of the service. 
+            PAADhyvex is provided "as is" without warranties. We are not liable for any damages arising from your use of the service. 
             The information provided is for educational purposes and should not replace professional medical advice.
           </p>
         </div>
@@ -101,7 +101,7 @@ export default function TermsPage() {
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>Contact</h2>
           <p className={styles.text}>
-            For questions about these Terms of Service, contact us at support@paadbank.org
+            For questions about these Terms of Service, contact us at support@paadhyvex.org
           </p>
         </div>
 

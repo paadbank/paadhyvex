@@ -1,4 +1,4 @@
-# PAAD Bank - Menstrual Health Management Platform
+# PAAD Hyvex - Menstrual Health Management Platform
 
 A comprehensive Next.js 14+ application for managing menstrual health, pad distribution, expenses, and reporting with role-based access control.
 
@@ -145,11 +145,6 @@ npm install
 ### 2. Configure Environment Variables
 
 Create a `.env.local` file in the root directory:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://cxpuwueyjkotzbxmphvk.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4cHV3dWV5amtvdHpieG1waHZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3OTQ2ODQsImV4cCI6MjA4ODM3MDY4NH0.mp-EXZNMrTp5oZfAr6CJWjfkZpeefj2HFXIPDhyFOfA
-```
 
 ### 3. Set Up Supabase Database
 

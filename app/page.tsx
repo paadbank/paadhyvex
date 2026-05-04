@@ -8,7 +8,8 @@ import { supabaseBrowser } from '@/lib/supabase/client';
 import SideDrawer from '@/lib/SideDrawer';
 import styles from './page.module.css';
 
-type Story = { id: string; title: string; location: string; story_text: string; media_url: string; media_type: 'image' | 'video'; category: string; };
+type StoryMedia = { id: string; link: string; type: 'image' | 'video' };
+type Story = { id: string; title: string; location: string; story_text: string; category: string; story_media: StoryMedia[]; };
 
 function getFileId(url: string) {
   const m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
@@ -23,38 +24,42 @@ function getEmbed(url: string) {
   return id ? `https://drive.google.com/file/d/${id}/preview` : url;
 }
 
-// Featured video reel — shows the first published video after the mission section
+// Featured video reel — shows the first published story that has a video media item
 function VideoReel({ theme }: { theme: string }) {
-  const [video, setVideo] = useState<Story | null>(null);
+  const [video, setVideo] = useState<{ story: Story; mediaLink: string } | null>(null);
   useEffect(() => {
     supabaseBrowser
-      .from('stories')
-      .select('id,title,location,story_text,media_url,media_type,category')
-      .eq('is_published', true)
-      .eq('media_type', 'video')
+      .from('story_media')
+      .select('link, stories!inner(id,title,location,story_text,category,is_published,story_media(*))')
+      .eq('type', 'video')
+      .eq('stories.is_published', true)
       .order('created_at', { ascending: false })
       .limit(1)
-      .then(({ data }) => setVideo(data?.[0] || null));
+      .then(({ data }) => {
+        const row = data?.[0] as { link: string; stories: Story } | undefined;
+        if (row) setVideo({ story: row.stories, mediaLink: row.link });
+      });
   }, []);
   if (!video) return null;
+  const { story, mediaLink } = video;
   return (
     <section className={styles.videoReel}>
       <div className={styles.videoReelInner}>
         <div className={styles.videoReelText}>
           <span className={styles.videoReelBadge}>📹 From the Field</span>
-          <h2 className={styles.videoReelTitle}>{video.title}</h2>
-          {video.location && <p className={styles.videoReelLocation}>📍 {video.location}</p>}
+          <h2 className={styles.videoReelTitle}>{story.title}</h2>
+          {story.location && <p className={styles.videoReelLocation}>📍 {story.location}</p>}
           <p className={styles.videoReelExcerpt}>
-            {video.story_text.length > 160 ? video.story_text.slice(0, 160) + '…' : video.story_text}
+            {story.story_text.length > 160 ? story.story_text.slice(0, 160) + '…' : story.story_text}
           </p>
           <a href="/stories" className={styles.videoReelLink}>See all stories →</a>
         </div>
         <div className={styles.videoReelFrame}>
           <iframe
-            src={getEmbed(video.media_url)}
+            src={getEmbed(mediaLink)}
             allow="autoplay; fullscreen"
             allowFullScreen
-            title={video.title}
+            title={story.title}
             className={styles.videoReelIframe}
           />
         </div>
@@ -69,11 +74,11 @@ function StoriesPreview({ theme, router }: { theme: string; router: { push: (hre
   useEffect(() => {
     supabaseBrowser
       .from('stories')
-      .select('id,title,location,story_text,media_url,media_type,category')
+      .select('id,title,location,story_text,category,story_media(*)')
       .eq('is_published', true)
       .order('created_at', { ascending: false })
       .limit(4)
-      .then(({ data }) => setStories(data || []));
+      .then(({ data }) => setStories((data || []) as Story[]));
     supabaseBrowser
       .from('founder_story')
       .select('title')
@@ -99,14 +104,16 @@ function StoriesPreview({ theme, router }: { theme: string; router: { push: (hre
             onClick={() => router.push('/stories')}
           >
             <div className={styles.storyMedia}>
-              {s.media_type === 'video' ? (
+              {s.story_media[0]?.type === 'video' ? (
                 <div className={styles.storyVideoThumb}>
                   <div className={styles.storyPlayBtn}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
                   </div>
                 </div>
+              ) : s.story_media[0] ? (
+                <img src={getThumb(s.story_media[0].link)} alt={s.title} className={styles.storyImg} loading="lazy" />
               ) : (
-                <img src={getThumb(s.media_url)} alt={s.title} className={styles.storyImg} loading="lazy" />
+                <div className={styles.storyVideoThumb} />
               )}
               <div className={styles.storyOverlay}>
                 {s.category && <span className={styles.storyTag}>{s.category}</span>}

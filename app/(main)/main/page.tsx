@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useDemandState } from '@/lib/state-stack';
@@ -19,6 +19,7 @@ export default function Main() {
   const { theme } = useTheme();
   const { t } = useLanguage();
   const [active, setActive] = useState('dashboard-stack');
+
   const [profile] = useDemandState<any>(null, {
     key: 'profile',
     persist: true,
@@ -27,13 +28,13 @@ export default function Main() {
 
   const userRole = profile?.role;
 
-  const navStackMap = new Map<string, React.ReactElement>([
+  const navStackMap = useMemo(() => new Map<string, React.ReactElement>([
     ['dashboard-stack', <DashboardStack key="dashboard-stack" />],
     ...(userRole !== 'distributor' && userRole !== 'logger' ? [['health-stack', <HealthStack key="health-stack" />] as [string, React.ReactElement]] : []),
     ['management-stack', <ManagementStack key="management-stack" />],
     ['notifications-stack', <NotificationsStack key="notifications-stack" />],
     ['profile-stack', <ProfileStack key="profile-stack" />],
-  ]);
+  ]), [userRole]);
 
   const allNavigationItems = [
       {

@@ -648,3 +648,114 @@
   display: block;
   box-sizing: border-box;
 }
+
+/* ── Media / Member tables ── */
+.tableHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.addRowBtn {
+  padding: 0.3rem 0.875rem;
+  border-radius: 6px;
+  border: 1.5px solid #dc2626;
+  background: transparent;
+  color: #dc2626;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.addRowBtn:hover { background: rgba(220,38,38,0.08); }
+
+.mediaTable,
+.membersTable {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.mediaRow,
+.memberRow {
+  display: grid;
+  gap: 0.5rem;
+  align-items: start;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid;
+}
+
+.mediaRow { grid-template-columns: 90px 1fr 32px; grid-template-rows: auto auto; }
+.memberRow { grid-template-columns: 1fr 32px; }
+
+.mediaRow_light, .memberRow_light { background: #f9f9f9; border-color: #e5e7eb; }
+.mediaRow_dark,  .memberRow_dark  { background: #252525; border-color: #404040; }
+
+.mediaRowPreview { grid-column: 1 / -1; }
+
+.typeSelect,
+.linkInput {
+  padding: 0.5rem 0.625rem;
+  border-radius: 6px;
+  border: 1px solid #d4cfc4;
+  font-size: 0.85rem;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.mediaRow_dark .typeSelect,
+.mediaRow_dark .linkInput,
+.memberRow_dark .linkInput {
+  background: #1e1e1e;
+  color: #f5f0e8;
+  border-color: #555;
+}
+
+.typeSelect:focus, .linkInput:focus { outline: none; border-color: #dc2626; }
+
+.removeRowBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(220,38,38,0.1);
+  color: #dc2626;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s;
+  align-self: center;
+}
+.removeRowBtn:hover { background: rgba(220,38,38,0.22); }
+
+/* previewActions / previewBtn kept for founder form */
+.previewActions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem; }
+.previewBtn {
+  padding: 0.4rem 0.875rem;
+  border-radius: 6px;
+  border: 1.5px solid #dc2626;
+  background: transparent;
+  color: #dc2626;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.previewBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+.clearPreviewBtn {
+  padding: 0.4rem 0.875rem;
+  border-radius: 6px;
+  border: 1px solid rgba(128,128,128,0.3);
+  background: transparent;
+  color: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.clearPreviewBtn:hover { opacity: 1; }

@@ -14,6 +14,7 @@ import LogCyclePage from './log-cycle-page/page';
 import TransactionsPage from './transactions-page/page';
 import LedgerPage from './ledger-page/page';
 import StoriesPage from './stories-page/page';
+import StoriesViewPage from './stories-view-page/page';
 
 const managementStackNavLink = {
   management_home: ManagementHome,
@@ -29,6 +30,7 @@ const managementStackNavLink = {
   transactions_page: TransactionsPage,
   ledger_page: LedgerPage,
   stories_page: StoriesPage,
+  stories_view_page: StoriesViewPage,
 };
 
 export const ManagementStack = () => (

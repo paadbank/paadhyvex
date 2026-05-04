@@ -17,6 +17,13 @@ export default function ManagementHome() {
     loadUserRole();
   }, []);
 
+  // Handle cross-stack navigation from dashboard stories strip
+  useEffect(() => {
+    const handler = () => nav.push('stories_view_page');
+    window.addEventListener('nav:stories', handler);
+    return () => window.removeEventListener('nav:stories', handler);
+  }, [nav]);
+
   const loadUserRole = async () => {
     const { data: { user } } = await supabaseBrowser.auth.getUser();
     if (!user) return;
@@ -75,6 +82,14 @@ export default function ManagementHome() {
                 <p>User management and settings</p>
               </div>
             </>
+          )}
+
+          {!isAdmin && (
+            <div className={`${styles.card} ${styles[`card_${theme}`]}`} onClick={() => nav.push('stories_view_page')}>
+              <span className={styles.icon}>📸</span>
+              <h3>Stories</h3>
+              <p>Read field stories and updates</p>
+            </div>
           )}
 
           <div className={`${styles.card} ${styles[`card_${theme}`]}`} onClick={() => nav.push('messaging_page')}>

@@ -650,15 +650,8 @@
 }
 
 /* ── Media / Member tables ── */
-.tableHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
-}
-
 .addRowBtn {
-  padding: 0.3rem 0.875rem;
+  padding: 0.4rem 1rem;
   border-radius: 6px;
   border: 1.5px solid #dc2626;
   background: transparent;
@@ -667,8 +660,35 @@
   font-weight: 700;
   cursor: pointer;
   transition: background 0.15s;
+  margin-top: 0.5rem;
+  width: fit-content;
 }
 .addRowBtn:hover { background: rgba(220,38,38,0.08); }
+
+.rowControls {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  align-self: center;
+}
+
+.arrowBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid rgba(128,128,128,0.25);
+  background: transparent;
+  color: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.arrowBtn:hover:not(:disabled) { border-color: #dc2626; color: #dc2626; }
+.arrowBtn:disabled { opacity: 0.2; cursor: default; }
 
 .mediaTable,
 .membersTable {
@@ -687,8 +707,8 @@
   border: 1px solid;
 }
 
-.mediaRow { grid-template-columns: 90px 1fr 32px; grid-template-rows: auto auto; }
-.memberRow { grid-template-columns: 1fr 32px; }
+.mediaRow { grid-template-columns: 90px 1fr auto; grid-template-rows: auto auto; }
+.memberRow { grid-template-columns: 1fr auto; }
 
 .mediaRow_light, .memberRow_light { background: #f9f9f9; border-color: #e5e7eb; }
 .mediaRow_dark,  .memberRow_dark  { background: #252525; border-color: #404040; }

@@ -288,12 +288,12 @@
   width: 100%;
   aspect-ratio: 16 / 9;
   background: #000;
-  position: relative;   /* key: iframe uses absolute inset */
+  position: relative;
   overflow: hidden;
 }
 
 .detailIframe {
-  position: absolute;   /* fills the exact 16/9 box — no clipping */
+  position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
@@ -308,23 +308,47 @@
   display: block;
 }
 
-.detailCarouselNav {
+/* Arrow buttons overlaid on the frame */
+.carouselArrowBtn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 0.625rem;
-  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(4px);
+  transition: background 0.2s;
+  -webkit-tap-highlight-color: transparent;
 }
+.carouselArrowBtn:hover:not(:disabled) { background: rgba(0,0,0,0.82); }
+.carouselArrowBtn:disabled { opacity: 0.2; cursor: default; }
+.carouselArrowLeft  { left: 0.625rem; }
+.carouselArrowRight { right: 0.625rem; }
 
-.detailDot {
-  width: 8px; height: 8px;
-  border-radius: 50%; border: none;
-  background: rgba(255,255,255,0.3);
-  cursor: pointer; padding: 0;
-  transition: background 0.2s, transform 0.2s;
+.carouselCounter {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 2rem;
+  backdrop-filter: blur(4px);
+  pointer-events: none;
 }
-.detailDotActive { background: #dc2626; transform: scale(1.35); }
 
 .detailMediaEmpty {
   width: 100%;

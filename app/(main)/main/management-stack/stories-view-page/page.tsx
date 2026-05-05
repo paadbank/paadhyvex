@@ -32,14 +32,24 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
         ) : (
           <img src={driveImg(cur.link)} alt={title} className={styles.detailImg} />
         )}
+        {media.length > 1 && (
+          <>
+            <button
+              className={`${styles.carouselArrowBtn} ${styles.carouselArrowLeft}`}
+              onClick={() => setIdx(i => Math.max(0, i - 1))}
+              disabled={idx === 0}
+              aria-label="Previous media"
+            >&#8249;</button>
+            <button
+              className={`${styles.carouselArrowBtn} ${styles.carouselArrowRight}`}
+              onClick={() => setIdx(i => Math.min(media.length - 1, i + 1))}
+              disabled={idx === media.length - 1}
+              aria-label="Next media"
+            >&#8250;</button>
+            <div className={styles.carouselCounter}>{idx + 1} / {media.length}</div>
+          </>
+        )}
       </div>
-      {media.length > 1 && (
-        <div className={styles.detailCarouselNav}>
-          {media.map((_, i) => (
-            <button key={i} onClick={() => setIdx(i)} className={`${styles.detailDot} ${i === idx ? styles.detailDotActive : ''}`} aria-label={`Media ${i + 1}`} />
-          ))}
-        </div>
-      )}
     </div>
   );
 }

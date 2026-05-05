@@ -211,12 +211,22 @@ export default function StoriesPage() {
   const removeMedia = (i: number) => setMediaDrafts(d => d.filter((_, idx) => idx !== i));
   const updateMedia = (i: number, patch: Partial<MediaDraft>) =>
     setMediaDrafts(d => d.map((m, idx) => idx === i ? { ...m, ...patch } : m));
+  const moveMedia = (i: number, dir: -1 | 1) => {
+    const next = i + dir;
+    if (next < 0 || next >= mediaDrafts.length) return;
+    setMediaDrafts(d => { const a = [...d]; [a[i], a[next]] = [a[next], a[i]]; return a; });
+  };
 
   // Member draft helpers
   const addMember = () => setMemberDrafts(d => [...d, { fullname: '' }]);
   const removeMember = (i: number) => setMemberDrafts(d => d.filter((_, idx) => idx !== i));
   const updateMember = (i: number, fullname: string) =>
     setMemberDrafts(d => d.map((m, idx) => idx === i ? { fullname } : m));
+  const moveMember = (i: number, dir: -1 | 1) => {
+    const next = i + dir;
+    if (next < 0 || next >= memberDrafts.length) return;
+    setMemberDrafts(d => { const a = [...d]; [a[i], a[next]] = [a[next], a[i]]; return a; });
+  };
 
   return (
     <main className={`${styles.container} ${styles[`container_${theme}`]}`}>
@@ -340,10 +350,7 @@ export default function StoriesPage() {
 
                 {/* ── MEDIA TABLE ── */}
                 <div className={`${styles.field} ${styles.fullWidth}`}>
-                  <div className={styles.tableHeader}>
-                    <label>Media</label>
-                    <button type="button" className={styles.addRowBtn} onClick={addMedia}>+ Add</button>
-                  </div>
+                  <label>Media</label>
                   <span className={styles.hint}>Share each file as &quot;Anyone with the link&quot; then paste the Drive link.</span>
                   <div className={styles.mediaTable}>
                     {mediaDrafts.map((m, i) => (
@@ -358,42 +365,43 @@ export default function StoriesPage() {
                           placeholder="https://drive.google.com/file/d/FILE_ID/view"
                           className={styles.linkInput}
                         />
-                        <button type="button" className={styles.removeRowBtn} onClick={() => removeMedia(i)} title="Remove">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                          </svg>
-                        </button>
+                        <div className={styles.rowControls}>
+                          <button type="button" className={styles.arrowBtn} onClick={() => moveMedia(i, -1)} disabled={i === 0} title="Move up">‹</button>
+                          <button type="button" className={styles.arrowBtn} onClick={() => moveMedia(i, 1)} disabled={i === mediaDrafts.length - 1} title="Move down">›</button>
+                          <button type="button" className={styles.removeRowBtn} onClick={() => removeMedia(i)} title="Remove">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                          </button>
+                        </div>
                         {m.link && <div className={styles.mediaRowPreview}><MediaPreview url={m.link} type={m.type} /></div>}
                       </div>
                     ))}
                   </div>
+                  <button type="button" className={styles.addRowBtn} onClick={addMedia}>+ Add Media</button>
                 </div>
 
                 {/* ── MEMBERS TABLE ── */}
                 <div className={`${styles.field} ${styles.fullWidth}`}>
-                  <div className={styles.tableHeader}>
-                    <label>People / Members</label>
-                    <button type="button" className={styles.addRowBtn} onClick={addMember}>+ Add</button>
-                  </div>
-                  {memberDrafts.length > 0 && (
-                    <div className={styles.membersTable}>
-                      {memberDrafts.map((m, i) => (
-                        <div key={i} className={`${styles.memberRow} ${styles[`memberRow_${theme}`]}`}>
-                          <input
-                            value={m.fullname}
-                            onChange={e => updateMember(i, e.target.value)}
-                            placeholder="Full name"
-                            className={styles.linkInput}
-                          />
+                  <label>People / Members</label>
+                  <div className={styles.membersTable}>
+                    {memberDrafts.map((m, i) => (
+                      <div key={i} className={`${styles.memberRow} ${styles[`memberRow_${theme}`]}`}>
+                        <input
+                          value={m.fullname}
+                          onChange={e => updateMember(i, e.target.value)}
+                          placeholder="Full name"
+                          className={styles.linkInput}
+                        />
+                        <div className={styles.rowControls}>
+                          <button type="button" className={styles.arrowBtn} onClick={() => moveMember(i, -1)} disabled={i === 0} title="Move up">‹</button>
+                          <button type="button" className={styles.arrowBtn} onClick={() => moveMember(i, 1)} disabled={i === memberDrafts.length - 1} title="Move down">›</button>
                           <button type="button" className={styles.removeRowBtn} onClick={() => removeMember(i)} title="Remove">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                            </svg>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                           </button>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      </div>
+                    ))}
+                  </div>
+                  <button type="button" className={styles.addRowBtn} onClick={addMember}>+ Add Person</button>
                 </div>
 
                 <div className={styles.field}>

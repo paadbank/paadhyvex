@@ -8,6 +8,30 @@ import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner';
 import EmptyRecord from '@/components/EmptyRecord/EmptyRecord';
 import styles from './page.module.css';
 
+async function getMediaUrl(mediaId: string): Promise<string> {
+  try {
+    const res = await fetch(`/api/get-media?id=${mediaId}`);
+    const data = await res.json();
+    return data.url;
+  } catch {
+    return '';
+  }
+}
+
+function StoryThumb({ mediaId, title }: { mediaId: string; title: string }) {
+  const [url, setUrl] = useState('');
+  
+  useEffect(() => {
+    let cancelled = false;
+    getMediaUrl(mediaId).then(u => {
+      if (!cancelled) setUrl(u);
+    });
+    return () => { cancelled = true; };
+  }, [mediaId]);
+  
+  return url ? <img src={url} alt={title} className={styles.thumbImg} /> : <LoadingSpinner />;
+}
+
 type StoryMedia = { id: string; link: string; type: 'image' | 'video' };
 type StoryMember = { id: string; fullname: string };
 type Story = {
@@ -16,15 +40,11 @@ type Story = {
   story_media: StoryMedia[]; story_members: StoryMember[];
 };
 
-function getFileId(url: string) { const m = url.match(/\/d\/([a-zA-Z0-9_-]+)/); return m ? m[1] : null; }
-function driveImg(url: string) { const id = getFileId(url); return id ? `https://lh3.googleusercontent.com/d/${id}` : url; }
-function driveEmbed(url: string) { const id = getFileId(url); return id ? `https://drive.google.com/file/d/${id}/preview` : url; }
-
 function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string }) {
   const [idx, setIdx] = useState(0);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [iframeLoaded, setIframeLoaded] = useState(false);
+  const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 900);
@@ -34,9 +54,24 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    const loadMedia = async () => {
+      for (const m of media) {
+        if (!mediaUrls[m.id] && !cancelled) {
+          const url = await getMediaUrl(m.id);
+          if (url && !cancelled) {
+            setMediaUrls(prev => ({ ...prev, [m.id]: url }));
+          }
+        }
+      }
+    };
+    loadMedia();
+    return () => { cancelled = true; };
+  }, [media.map(m => m.id).join(',')]);
+
+  useEffect(() => {
     if (videoModalOpen) {
       document.body.style.overflow = 'hidden';
-      setIframeLoaded(false);
     } else {
       document.body.style.overflow = '';
     }
@@ -45,21 +80,18 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
 
   if (media.length === 0) return <div className={styles.detailMediaEmpty}><span>📷</span></div>;
   const cur = media[idx];
+  const curUrl = mediaUrls[cur.id];
+  
   return (
     <>
       <div className={styles.detailCarousel}>
         <div className={styles.detailCarouselFrame}>
-          {cur.type === 'video' ? (
+          {!curUrl ? (
+            <div className={styles.detailMediaEmpty}><LoadingSpinner /></div>
+          ) : cur.type === 'video' ? (
             isMobile ? (
               <div className={styles.videoPoster} onClick={() => setVideoModalOpen(true)}>
-                <img 
-                  src={`https://drive.google.com/thumbnail?id=${getFileId(cur.link)}&sz=w1000`}
-                  alt={title}
-                  className={styles.videoThumbnail}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
+                <video src={curUrl} className={styles.videoThumbnail} />
                 <div className={styles.videoPosterOverlay}>
                   <div className={styles.videoPosterPlayBtn}>
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
@@ -68,10 +100,10 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
                 </div>
               </div>
             ) : (
-              <iframe src={driveEmbed(cur.link)} className={styles.detailIframe} allow="autoplay; fullscreen" allowFullScreen title={title} />
+              <video src={curUrl} controls className={styles.detailIframe} />
             )
           ) : (
-            <img src={driveImg(cur.link)} alt={title} className={styles.detailImg} />
+            <img src={curUrl} alt={title} className={styles.detailImg} />
           )}
           {media.length > 1 && (
             <>
@@ -93,7 +125,7 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
         </div>
       </div>
 
-      {videoModalOpen && isMobile && cur.type === 'video' && (
+      {videoModalOpen && isMobile && cur.type === 'video' && curUrl && (
         <div className={styles.videoModal} onClick={() => setVideoModalOpen(false)}>
           <div className={styles.videoModalContent} onClick={e => e.stopPropagation()}>
             <button className={styles.videoModalClose} onClick={() => setVideoModalOpen(false)} aria-label="Close video">
@@ -103,19 +135,7 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
               </svg>
             </button>
             <div className={styles.videoModalFrame}>
-              {!iframeLoaded && (
-                <div className={styles.videoModalLoading}>
-                  <div className={styles.videoModalSpinner} />
-                </div>
-              )}
-              <iframe
-                src={driveEmbed(cur.link)}
-                className={styles.videoModalIframe}
-                allow="autoplay; fullscreen"
-                allowFullScreen
-                title={title}
-                onLoad={() => setIframeLoaded(true)}
-              />
+              <video src={curUrl} controls autoPlay className={styles.videoModalIframe} />
             </div>
           </div>
         </div>
@@ -205,7 +225,6 @@ export default function StoriesViewPage() {
 
   const filtered = filter === 'all' ? stories : stories.filter(s => s.category?.trim().toLowerCase() === filter.toLowerCase());
   
-  // Get unique categories (case-insensitive, trimmed)
   const categoryMap = new Map<string, string>();
   stories.forEach(s => {
     const cat = s.category?.trim();
@@ -240,7 +259,6 @@ export default function StoriesViewPage() {
     return () => window.removeEventListener('keydown', handler);
   }, [selected, navigate]);
 
-  // Full-page detail view
   if (selected) {
     return (
       <StoryDetail
@@ -294,24 +312,13 @@ export default function StoriesViewPage() {
                   <div className={styles.cardThumb}>
                     {!thumb ? <span className={styles.thumbPlaceholder}>📷</span>
                       : thumb.type === 'video' ? (
-                        <img 
-                          src={`https://drive.google.com/thumbnail?id=${getFileId(thumb.link)}&sz=w1000`}
-                          alt={story.title}
-                          className={styles.thumbImg}
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            const parent = target.parentElement;
-                            if (parent) {
-                              const fallback = document.createElement('div');
-                              fallback.className = styles.thumbVideo;
-                              fallback.innerHTML = '<div class="' + styles.thumbPlay + '"><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg></div>';
-                              parent.insertBefore(fallback, target);
-                            }
-                          }}
-                        />
+                        <div className={styles.thumbVideo}>
+                          <div className={styles.thumbPlay}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                          </div>
+                        </div>
                       ) : (
-                        <img src={driveImg(thumb.link)} alt={story.title} className={styles.thumbImg} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        <StoryThumb mediaId={thumb.id} title={story.title} />
                       )}
                     {story.story_media.length > 1 && <span className={styles.mediaCountBadge}>+{story.story_media.length - 1}</span>}
                   </div>

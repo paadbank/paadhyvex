@@ -6,6 +6,37 @@ import { useTheme } from '@/context/ThemeContext';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import styles from './stories.module.css';
 
+async function getMediaUrl(mediaId: string): Promise<string> {
+  try {
+    const res = await fetch(`/api/get-media?id=${mediaId}`);
+    const data = await res.json();
+    return data.url;
+  } catch {
+    return '';
+  }
+}
+
+function FounderImage({ founderId, imageUrl, name }: { founderId: string; imageUrl: string; name: string }) {
+  const [url, setUrl] = useState('');
+  
+  useEffect(() => {
+    fetch(`/api/get-founder-image?id=${founderId}`)
+      .then(res => res.json())
+      .then(data => setUrl(data.url))
+      .catch(() => setUrl(imageUrl));
+  }, [founderId, imageUrl]);
+  
+  return url ? <img src={url} alt={name} className={styles.founderBannerAvatar} /> : <div className={styles.spinner} />;
+}
+
+function StoryThumb({ mediaId, title }: { mediaId: string; title: string }) {
+  const [url, setUrl] = useState('');
+  useEffect(() => {
+    getMediaUrl(mediaId).then(setUrl);
+  }, [mediaId]);
+  return url ? <img src={url} alt={title} className={styles.media} loading="lazy" /> : <div className={styles.videoThumb}><div className={styles.playBtn}><svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg></div></div>;
+}
+
 type StoryMedia = { id: string; link: string; type: 'image' | 'video' };
 type StoryMember = { id: string; fullname: string };
 type Story = {
@@ -15,15 +46,12 @@ type Story = {
 };
 type FounderStory = { id: string; title: string; description: string; founder_name: string; founder_date: string; image_url: string; };
 
-function getFileId(url: string) { const m = url.match(/\/d\/([a-zA-Z0-9_-]+)/); return m ? m[1] : null; }
-function getImageUrl(url: string) { const id = getFileId(url); return id ? `https://lh3.googleusercontent.com/d/${id}` : url; }
-function getEmbedUrl(url: string) { const id = getFileId(url); return id ? `https://drive.google.com/file/d/${id}/preview` : url; }
 
 function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string }) {
   const [idx, setIdx] = useState(0);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [iframeLoaded, setIframeLoaded] = useState(false);
+  const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 900);
@@ -33,9 +61,18 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
   }, []);
 
   useEffect(() => {
+    media.forEach(m => {
+      if (!mediaUrls[m.id]) {
+        getMediaUrl(m.id).then(url => {
+          if (url) setMediaUrls(prev => ({ ...prev, [m.id]: url }));
+        });
+      }
+    });
+  }, [media, mediaUrls]);
+
+  useEffect(() => {
     if (videoModalOpen) {
       document.body.style.overflow = 'hidden';
-      setIframeLoaded(false);
     } else {
       document.body.style.overflow = '';
     }
@@ -48,21 +85,18 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
     </div>
   );
   const cur = media[idx];
+  const curUrl = mediaUrls[cur.id];
+  
   return (
     <>
       <div className={styles.detailCarousel}>
         <div className={styles.detailCarouselFrame}>
-          {cur.type === 'video' ? (
+          {!curUrl ? (
+            <div className={styles.detailMediaEmpty}><div className={styles.spinner} /></div>
+          ) : cur.type === 'video' ? (
             isMobile ? (
               <div className={styles.videoPoster} onClick={() => setVideoModalOpen(true)}>
-                <img 
-                  src={`https://drive.google.com/thumbnail?id=${getFileId(cur.link)}&sz=w1000`}
-                  alt={title}
-                  className={styles.videoThumbnail}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
+                <video src={curUrl} className={styles.videoThumbnail} />
                 <div className={styles.videoPosterOverlay}>
                   <div className={styles.videoPosterPlayBtn}>
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
@@ -71,10 +105,10 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
                 </div>
               </div>
             ) : (
-              <iframe src={getEmbedUrl(cur.link)} className={styles.detailIframe} allow="autoplay; fullscreen" allowFullScreen title={title} />
+              <video src={curUrl} controls className={styles.detailIframe} />
             )
           ) : (
-            <img src={getImageUrl(cur.link)} alt={title} className={styles.detailImg} />
+            <img src={curUrl} alt={title} className={styles.detailImg} />
           )}
           {media.length > 1 && (
             <>
@@ -96,7 +130,7 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
         </div>
       </div>
 
-      {videoModalOpen && isMobile && cur.type === 'video' && (
+      {videoModalOpen && isMobile && cur.type === 'video' && curUrl && (
         <div className={styles.videoModal} onClick={() => setVideoModalOpen(false)}>
           <div className={styles.videoModalContent} onClick={e => e.stopPropagation()}>
             <button className={styles.videoModalClose} onClick={() => setVideoModalOpen(false)} aria-label="Close video">
@@ -106,19 +140,7 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
               </svg>
             </button>
             <div className={styles.videoModalFrame}>
-              {!iframeLoaded && (
-                <div className={styles.videoModalLoading}>
-                  <div className={styles.videoModalSpinner} />
-                </div>
-              )}
-              <iframe
-                src={getEmbedUrl(cur.link)}
-                className={styles.videoModalIframe}
-                allow="autoplay; fullscreen"
-                allowFullScreen
-                title={title}
-                onLoad={() => setIframeLoaded(true)}
-              />
+              <video src={curUrl} controls autoPlay className={styles.videoModalIframe} />
             </div>
           </div>
         </div>
@@ -282,7 +304,7 @@ export default function StoriesPage() {
           <div className={styles.founderBannerInner}>
             <div className={styles.founderBannerLeft}>
               {founder.image_url && (
-                <img src={getFileId(founder.image_url) ? `https://lh3.googleusercontent.com/d/${getFileId(founder.image_url)}` : founder.image_url} alt={founder.founder_name} className={styles.founderBannerAvatar} />
+                <FounderImage founderId={founder.id} imageUrl={founder.image_url} name={founder.founder_name} />
               )}
               <div>
                 <span className={styles.founderBannerBadge}>✦ Founder&apos;s Story</span>
@@ -332,27 +354,11 @@ export default function StoriesPage() {
                     <div className={styles.videoThumb}><div className={styles.playBtn}><svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg></div></div>
                   ) : thumb.type === 'video' ? (
                     <>
-                      <img 
-                        src={`https://drive.google.com/thumbnail?id=${getFileId(thumb.link)}&sz=w1000`}
-                        alt={story.title}
-                        className={styles.media}
-                        loading="lazy"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          const parent = target.parentElement;
-                          if (parent) {
-                            const fallback = document.createElement('div');
-                            fallback.className = styles.videoThumb;
-                            fallback.innerHTML = '<div class="' + styles.playBtn + '"><svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg></div>';
-                            parent.insertBefore(fallback, target);
-                          }
-                        }}
-                      />
+                      <div className={styles.videoThumb}><div className={styles.playBtn}><svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg></div></div>
                       <div className={styles.videoBadge}><svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>Video</div>
                     </>
                   ) : (
-                    <img src={getImageUrl(thumb.link)} alt={story.title} className={styles.media} loading="lazy" />
+                    <StoryThumb mediaId={thumb.id} title={story.title} />
                   )}
                   <div className={styles.cardOverlay}>
                     {story.category && <span className={styles.tag}>{story.category}</span>}

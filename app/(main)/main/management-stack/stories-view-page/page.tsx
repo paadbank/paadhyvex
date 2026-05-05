@@ -294,15 +294,25 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
               const ctx = canvas.getContext('2d');
               if (ctx) {
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                setVideoThumbnails(prev => ({ ...prev, [m.id]: canvas.toDataURL('image/jpeg', 0.8) }));
+                const thumbData = canvas.toDataURL('image/jpeg', 0.8);
+                setVideoThumbnails(prev => ({ ...prev, [m.id]: thumbData }));
+                // Mark as loaded by removing from loading state
+                setLoadingUrls(prev => ({ ...prev, [m.id]: false }));
               }
             } catch (err) {
               console.error('Failed to capture video frame:', err);
+              setErrorUrls(prev => ({ ...prev, [m.id]: true }));
+              setLoadingUrls(prev => ({ ...prev, [m.id]: false }));
             }
             video.remove();
           };
           
           video.addEventListener('loadeddata', captureFrame);
+          video.addEventListener('error', () => {
+            setErrorUrls(prev => ({ ...prev, [m.id]: true }));
+            setLoadingUrls(prev => ({ ...prev, [m.id]: false }));
+            video.remove();
+          });
           video.currentTime = 0.1;
         }
       }
@@ -340,19 +350,19 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
             <div className={styles.detailMediaEmpty}><LoadingSpinner /></div>
           ) : cur.type === 'video' ? (
             isMobile ? (
-              <div className={styles.videoPoster} onClick={() => setVideoModalOpen(true)}>
-                {curThumbnail ? (
+              curThumbnail ? (
+                <div className={styles.videoPoster} onClick={() => setVideoModalOpen(true)}>
                   <img src={curThumbnail} alt={title} className={styles.videoThumbnail} />
-                ) : (
-                  <div className={styles.detailMediaEmpty}><LoadingSpinner /></div>
-                )}
-                <div className={styles.videoPosterOverlay}>
-                  <div className={styles.videoPosterPlayBtn}>
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                  <div className={styles.videoPosterOverlay}>
+                    <div className={styles.videoPosterPlayBtn}>
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                    </div>
+                    <p className={styles.videoPosterText}>Tap to play video</p>
                   </div>
-                  <p className={styles.videoPosterText}>Tap to play video</p>
                 </div>
-              </div>
+              ) : (
+                <div className={styles.detailMediaEmpty}><LoadingSpinner /></div>
+              )
             ) : (
               <video src={curUrl} controls className={styles.detailIframe} />
             )

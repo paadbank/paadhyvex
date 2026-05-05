@@ -22,35 +22,105 @@ function driveEmbed(url: string) { const id = getFileId(url); return id ? `https
 
 function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string }) {
   const [idx, setIdx] = useState(0);
+  const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 900);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    if (videoModalOpen) {
+      document.body.style.overflow = 'hidden';
+      setIframeLoaded(false);
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [videoModalOpen]);
+
   if (media.length === 0) return <div className={styles.detailMediaEmpty}><span>📷</span></div>;
   const cur = media[idx];
   return (
-    <div className={styles.detailCarousel}>
-      <div className={styles.detailCarouselFrame}>
-        {cur.type === 'video' ? (
-          <iframe src={driveEmbed(cur.link)} className={styles.detailIframe} allow="autoplay; fullscreen" allowFullScreen title={title} />
-        ) : (
-          <img src={driveImg(cur.link)} alt={title} className={styles.detailImg} />
-        )}
-        {media.length > 1 && (
-          <>
-            <button
-              className={`${styles.carouselArrowBtn} ${styles.carouselArrowLeft}`}
-              onClick={() => setIdx(i => Math.max(0, i - 1))}
-              disabled={idx === 0}
-              aria-label="Previous media"
-            >&#8249;</button>
-            <button
-              className={`${styles.carouselArrowBtn} ${styles.carouselArrowRight}`}
-              onClick={() => setIdx(i => Math.min(media.length - 1, i + 1))}
-              disabled={idx === media.length - 1}
-              aria-label="Next media"
-            >&#8250;</button>
-            <div className={styles.carouselCounter}>{idx + 1} / {media.length}</div>
-          </>
-        )}
+    <>
+      <div className={styles.detailCarousel}>
+        <div className={styles.detailCarouselFrame}>
+          {cur.type === 'video' ? (
+            isMobile ? (
+              <div className={styles.videoPoster} onClick={() => setVideoModalOpen(true)}>
+                <img 
+                  src={`https://drive.google.com/thumbnail?id=${getFileId(cur.link)}&sz=w1000`}
+                  alt={title}
+                  className={styles.videoThumbnail}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+                <div className={styles.videoPosterOverlay}>
+                  <div className={styles.videoPosterPlayBtn}>
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                  </div>
+                  <p className={styles.videoPosterText}>Tap to play video</p>
+                </div>
+              </div>
+            ) : (
+              <iframe src={driveEmbed(cur.link)} className={styles.detailIframe} allow="autoplay; fullscreen" allowFullScreen title={title} />
+            )
+          ) : (
+            <img src={driveImg(cur.link)} alt={title} className={styles.detailImg} />
+          )}
+          {media.length > 1 && (
+            <>
+              <button
+                className={`${styles.carouselArrowBtn} ${styles.carouselArrowLeft}`}
+                onClick={() => setIdx(i => Math.max(0, i - 1))}
+                disabled={idx === 0}
+                aria-label="Previous media"
+              >&#8249;</button>
+              <button
+                className={`${styles.carouselArrowBtn} ${styles.carouselArrowRight}`}
+                onClick={() => setIdx(i => Math.min(media.length - 1, i + 1))}
+                disabled={idx === media.length - 1}
+                aria-label="Next media"
+              >&#8250;</button>
+              <div className={styles.carouselCounter}>{idx + 1} / {media.length}</div>
+            </>
+          )}
+        </div>
       </div>
-    </div>
+
+      {videoModalOpen && isMobile && cur.type === 'video' && (
+        <div className={styles.videoModal} onClick={() => setVideoModalOpen(false)}>
+          <div className={styles.videoModalContent} onClick={e => e.stopPropagation()}>
+            <button className={styles.videoModalClose} onClick={() => setVideoModalOpen(false)} aria-label="Close video">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+            <div className={styles.videoModalFrame}>
+              {!iframeLoaded && (
+                <div className={styles.videoModalLoading}>
+                  <div className={styles.videoModalSpinner} />
+                </div>
+              )}
+              <iframe
+                src={driveEmbed(cur.link)}
+                className={styles.videoModalIframe}
+                allow="autoplay; fullscreen"
+                allowFullScreen
+                title={title}
+                onLoad={() => setIframeLoaded(true)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -133,8 +203,21 @@ export default function StoriesViewPage() {
       .then(({ data }) => { setStories((data || []) as Story[]); setLoading(false); });
   }, []);
 
-  const filtered = filter === 'all' ? stories : stories.filter(s => s.category === filter);
-  const categories = ['all', ...Array.from(new Set(stories.map(s => s.category).filter(Boolean)))];
+  const filtered = filter === 'all' ? stories : stories.filter(s => s.category?.trim().toLowerCase() === filter.toLowerCase());
+  
+  // Get unique categories (case-insensitive, trimmed)
+  const categoryMap = new Map<string, string>();
+  stories.forEach(s => {
+    const cat = s.category?.trim();
+    if (cat) {
+      const key = cat.toLowerCase();
+      if (!categoryMap.has(key)) {
+        categoryMap.set(key, cat);
+      }
+    }
+  });
+  const uniqueCategories = Array.from(categoryMap.values());
+  const categories = ['all', ...uniqueCategories];
 
   const openStory = (story: Story) => {
     setSelected(story);
@@ -211,7 +294,22 @@ export default function StoriesViewPage() {
                   <div className={styles.cardThumb}>
                     {!thumb ? <span className={styles.thumbPlaceholder}>📷</span>
                       : thumb.type === 'video' ? (
-                        <div className={styles.thumbVideo}><div className={styles.thumbPlay}><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg></div></div>
+                        <img 
+                          src={`https://drive.google.com/thumbnail?id=${getFileId(thumb.link)}&sz=w1000`}
+                          alt={story.title}
+                          className={styles.thumbImg}
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent) {
+                              const fallback = document.createElement('div');
+                              fallback.className = styles.thumbVideo;
+                              fallback.innerHTML = '<div class="' + styles.thumbPlay + '"><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg></div>';
+                              parent.insertBefore(fallback, target);
+                            }
+                          }}
+                        />
                       ) : (
                         <img src={driveImg(thumb.link)} alt={story.title} className={styles.thumbImg} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                       )}

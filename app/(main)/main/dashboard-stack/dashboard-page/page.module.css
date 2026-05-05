@@ -195,9 +195,10 @@
   transition: transform 0.2s, box-shadow 0.2s;
   border: 1px solid transparent;
   flex-shrink: 0;
-  width: 200px;
+  width: min(280px, 60vw);
   scroll-snap-align: start;
 }
+
 
 @media (min-width: 640px) {
   .storyCard { width: auto; flex-shrink: unset; }

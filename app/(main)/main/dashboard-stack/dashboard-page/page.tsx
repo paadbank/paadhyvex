@@ -15,6 +15,11 @@ function getThumb(url: string) {
   return m ? `https://lh3.googleusercontent.com/d/${m[1]}` : url;
 }
 
+function getFileId(url: string) {
+  const m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  return m ? m[1] : null;
+}
+
 export default function DashboardPage() {
   const { theme } = useTheme();
   const nav = useNav();
@@ -155,11 +160,28 @@ export default function DashboardPage() {
                   onClick={() => nav.push('stories_view_page')}
                 >
                   <div className={styles.storyMedia}>
-                    {s.story_media[0]?.type === 'video'
-                      ? <div className={styles.storyVideoThumb}><div className={styles.storyPlayIcon}><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg></div></div>
-                      : s.story_media[0]
-                        ? <img src={getThumb(s.story_media[0].link)} alt={s.title} className={styles.storyImg} />
-                        : <div className={styles.storyVideoThumb} />}
+                    {s.story_media[0]?.type === 'video' ? (
+                      <img 
+                        src={`https://drive.google.com/thumbnail?id=${getFileId(s.story_media[0].link)}&sz=w1000`}
+                        alt={s.title}
+                        className={styles.storyImg}
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent) {
+                            const fallback = document.createElement('div');
+                            fallback.className = styles.storyVideoThumb;
+                            fallback.innerHTML = '<div class="' + styles.storyPlayIcon + '"><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg></div>';
+                            parent.insertBefore(fallback, target);
+                          }
+                        }}
+                      />
+                    ) : s.story_media[0] ? (
+                      <img src={getThumb(s.story_media[0].link)} alt={s.title} className={styles.storyImg} />
+                    ) : (
+                      <div className={styles.storyVideoThumb} />
+                    )}
                   </div>
                   <div className={styles.storyBody}>
                     {s.category && <span className={styles.storyTag}>{s.category}</span>}

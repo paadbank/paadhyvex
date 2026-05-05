@@ -27,6 +27,25 @@ function getEmbed(url: string) {
 // Featured video reel — shows the first published story that has a video media item
 function VideoReel({ theme }: { theme: string }) {
   const [video, setVideo] = useState<{ story: Story; mediaLink: string } | null>(null);
+  const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 900);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    if (videoModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [videoModalOpen]);
+
   useEffect(() => {
     supabaseBrowser
       .from('story_media')
@@ -40,31 +59,75 @@ function VideoReel({ theme }: { theme: string }) {
         if (row) setVideo({ story: row.stories, mediaLink: row.link });
       });
   }, []);
+
   if (!video) return null;
   const { story, mediaLink } = video;
   return (
-    <section className={styles.videoReel}>
-      <div className={styles.videoReelInner}>
-        <div className={styles.videoReelText}>
-          <span className={styles.videoReelBadge}>📹 From the Field</span>
-          <h2 className={styles.videoReelTitle}>{story.title}</h2>
-          {story.location && <p className={styles.videoReelLocation}>📍 {story.location}</p>}
-          <p className={styles.videoReelExcerpt}>
-            {story.story_text.length > 160 ? story.story_text.slice(0, 160) + '…' : story.story_text}
-          </p>
-          <a href="/stories" className={styles.videoReelLink}>See all stories →</a>
+    <>
+      <section className={styles.videoReel}>
+        <div className={styles.videoReelInner}>
+          <div className={styles.videoReelText}>
+            <span className={styles.videoReelBadge}>📹 From the Field</span>
+            <h2 className={styles.videoReelTitle}>{story.title}</h2>
+            {story.location && <p className={styles.videoReelLocation}>📍 {story.location}</p>}
+            <p className={styles.videoReelExcerpt}>
+              {story.story_text.length > 160 ? story.story_text.slice(0, 160) + '…' : story.story_text}
+            </p>
+            <a href="/stories" className={styles.videoReelLink}>See all stories →</a>
+          </div>
+          <div className={styles.videoReelFrame}>
+            {isMobile ? (
+              <div className={styles.videoReelPoster} onClick={() => setVideoModalOpen(true)}>
+                <img 
+                  src={`https://drive.google.com/thumbnail?id=${getFileId(mediaLink)}&sz=w1000`}
+                  alt={story.title}
+                  className={styles.videoReelThumbnail}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+                <div className={styles.videoReelPosterOverlay}>
+                  <div className={styles.videoReelPlayBtn}>
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                  </div>
+                  <p className={styles.videoReelPosterText}>Tap to play video</p>
+                </div>
+              </div>
+            ) : (
+              <iframe
+                src={getEmbed(mediaLink)}
+                allow="autoplay; fullscreen"
+                allowFullScreen
+                title={story.title}
+                className={styles.videoReelIframe}
+              />
+            )}
+          </div>
         </div>
-        <div className={styles.videoReelFrame}>
-          <iframe
-            src={getEmbed(mediaLink)}
-            allow="autoplay; fullscreen"
-            allowFullScreen
-            title={story.title}
-            className={styles.videoReelIframe}
-          />
+      </section>
+
+      {videoModalOpen && isMobile && (
+        <div className={styles.videoModal} onClick={() => setVideoModalOpen(false)}>
+          <div className={styles.videoModalContent} onClick={e => e.stopPropagation()}>
+            <button className={styles.videoModalClose} onClick={() => setVideoModalOpen(false)} aria-label="Close video">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+            <div className={styles.videoModalFrame}>
+              <iframe
+                src={getEmbed(mediaLink)}
+                className={styles.videoModalIframe}
+                allow="autoplay; fullscreen"
+                allowFullScreen
+                title={story.title}
+              />
+            </div>
+          </div>
         </div>
-      </div>
-    </section>
+      )}
+    </>
   );
 }
 

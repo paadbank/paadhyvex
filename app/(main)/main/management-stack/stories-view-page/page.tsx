@@ -91,6 +91,7 @@ function StoryThumb({ mediaId, title }: { mediaId: string; title: string }) {
 
 function VideoThumb({ mediaId, title }: { mediaId: string; title: string }) {
   const [url, setUrl] = useState('');
+  const [thumbnail, setThumbnail] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   
@@ -107,7 +108,6 @@ function VideoThumb({ mediaId, title }: { mediaId: string; title: string }) {
         
         if (!cancelled && data?.processed_url) {
           setUrl(data.processed_url);
-          setLoading(false);
           return;
         }
         
@@ -118,8 +118,8 @@ function VideoThumb({ mediaId, title }: { mediaId: string; title: string }) {
             setUrl(result.url);
           } else {
             setError(true);
+            setLoading(false);
           }
-          setLoading(false);
         }
       } catch {
         if (!cancelled) {
@@ -133,18 +133,68 @@ function VideoThumb({ mediaId, title }: { mediaId: string; title: string }) {
     return () => { cancelled = true; };
   }, [mediaId]);
   
-  if (loading) return <div className={styles.thumbVideo}><div className={styles.spinner} /></div>;
-  if (error) return (
-    <div className={styles.thumbVideo}>
-      <div className={styles.thumbPlay}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+  // Generate thumbnail from video
+  useEffect(() => {
+    if (!url || error) return;
+    
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous';
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+    video.src = url;
+    
+    const captureFrame = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 360;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const thumbData = canvas.toDataURL('image/jpeg', 0.8);
+          setThumbnail(thumbData);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Failed to capture video frame:', err);
+        setError(true);
+        setLoading(false);
+      }
+      video.remove();
+    };
+    
+    video.addEventListener('loadeddata', captureFrame);
+    video.addEventListener('error', () => {
+      setError(true);
+      setLoading(false);
+      video.remove();
+    });
+    video.currentTime = 0.1;
+    
+    return () => {
+      video.removeEventListener('loadeddata', captureFrame);
+      video.remove();
+    };
+  }, [url, error]);
+  
+  if (loading) {
+    return <div className={styles.thumbVideo}><div className={styles.spinner} /></div>;
+  }
+  
+  if (error || !thumbnail) {
+    return (
+      <div className={styles.thumbVideo}>
+        <div className={styles.thumbPlay}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
   
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <video src={url} className={styles.thumbImg} />
+      <img src={thumbnail} alt={title} className={styles.thumbImg} />
       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
         <div className={styles.thumbPlay}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
@@ -169,6 +219,7 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
   const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
   const [loadingUrls, setLoadingUrls] = useState<Record<string, boolean>>({});
   const [errorUrls, setErrorUrls] = useState<Record<string, boolean>>({});
+  const [videoThumbnails, setVideoThumbnails] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setIdx(0);
@@ -223,6 +274,43 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
     return () => { cancelled = true; };
   }, [media.map(m => m.id).join(',')]);
 
+  // Generate video thumbnails
+  useEffect(() => {
+    const generateThumbnails = async () => {
+      for (const m of media) {
+        if (m.type === 'video' && mediaUrls[m.id] && !videoThumbnails[m.id]) {
+          const video = document.createElement('video');
+          video.crossOrigin = 'anonymous';
+          video.preload = 'metadata';
+          video.muted = true;
+          video.playsInline = true;
+          video.src = mediaUrls[m.id];
+          
+          const captureFrame = () => {
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width = video.videoWidth || 640;
+              canvas.height = video.videoHeight || 360;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                setVideoThumbnails(prev => ({ ...prev, [m.id]: canvas.toDataURL('image/jpeg', 0.8) }));
+              }
+            } catch (err) {
+              console.error('Failed to capture video frame:', err);
+            }
+            video.remove();
+          };
+          
+          video.addEventListener('loadeddata', captureFrame);
+          video.currentTime = 0.1;
+        }
+      }
+    };
+    
+    generateThumbnails();
+  }, [media.map(m => m.id).join(','), Object.keys(mediaUrls).join(',')]);
+
   useEffect(() => {
     if (videoModalOpen) {
       document.body.style.overflow = 'hidden';
@@ -238,6 +326,7 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
   const curUrl = mediaUrls[cur?.id];
   const isLoading = loadingUrls[cur?.id];
   const hasError = errorUrls[cur?.id];
+  const curThumbnail = videoThumbnails[cur?.id];
   
   return (
     <>
@@ -252,7 +341,11 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
           ) : cur.type === 'video' ? (
             isMobile ? (
               <div className={styles.videoPoster} onClick={() => setVideoModalOpen(true)}>
-                <video src={curUrl} className={styles.videoThumbnail} />
+                {curThumbnail ? (
+                  <img src={curThumbnail} alt={title} className={styles.videoThumbnail} />
+                ) : (
+                  <div className={styles.detailMediaEmpty}><LoadingSpinner /></div>
+                )}
                 <div className={styles.videoPosterOverlay}>
                   <div className={styles.videoPosterPlayBtn}>
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>

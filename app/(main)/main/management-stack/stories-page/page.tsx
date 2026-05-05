@@ -59,6 +59,7 @@ function StoryThumb({ mediaId, title }: { mediaId: string; title: string }) {
 
 function VideoThumb({ mediaId, title }: { mediaId: string; title: string }) {
   const [url, setUrl] = useState('');
+  const [thumbnail, setThumbnail] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   
@@ -75,7 +76,6 @@ function VideoThumb({ mediaId, title }: { mediaId: string; title: string }) {
         
         if (!cancelled && data?.processed_url) {
           setUrl(data.processed_url);
-          setLoading(false);
           return;
         }
         
@@ -86,8 +86,8 @@ function VideoThumb({ mediaId, title }: { mediaId: string; title: string }) {
             setUrl(result.url);
           } else {
             setError(true);
+            setLoading(false);
           }
-          setLoading(false);
         }
       } catch {
         if (!cancelled) {
@@ -101,12 +101,62 @@ function VideoThumb({ mediaId, title }: { mediaId: string; title: string }) {
     return () => { cancelled = true; };
   }, [mediaId]);
   
-  if (loading) return <div className={styles.thumbLoading}><div className={styles.spinner} /></div>;
-  if (error) return <span className={styles.videoIcon}>🎬</span>;
+  // Generate thumbnail from video
+  useEffect(() => {
+    if (!url || error) return;
+    
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous';
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+    video.src = url;
+    
+    const captureFrame = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 360;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const thumbData = canvas.toDataURL('image/jpeg', 0.8);
+          setThumbnail(thumbData);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Failed to capture video frame:', err);
+        setError(true);
+        setLoading(false);
+      }
+      video.remove();
+    };
+    
+    video.addEventListener('loadeddata', captureFrame);
+    video.addEventListener('error', () => {
+      setError(true);
+      setLoading(false);
+      video.remove();
+    });
+    video.currentTime = 0.1;
+    
+    return () => {
+      video.removeEventListener('loadeddata', captureFrame);
+      video.remove();
+    };
+  }, [url, error]);
+  
+  if (loading) {
+    return <div className={styles.thumbLoading}><div className={styles.spinner} /></div>;
+  }
+  
+  if (error || !thumbnail) {
+    return <span className={styles.videoIcon}>🎬</span>;
+  }
   
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <video src={url} className={styles.thumb} />
+      <img src={thumbnail} alt={title} className={styles.thumb} />
       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
         <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(220,38,38,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>

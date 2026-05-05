@@ -251,6 +251,28 @@
 
 .videoIcon { font-size: 1.75rem; }
 
+.thumbLoading {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1c1c1c, #2d2d2d);
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(220,38,38,0.2);
+  border-top-color: #dc2626;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .cardInfo {
   flex: 1;
   min-width: 0;

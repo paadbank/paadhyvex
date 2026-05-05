@@ -8,6 +8,114 @@ import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner';
 import EmptyRecord from '@/components/EmptyRecord/EmptyRecord';
 import styles from './page.module.css';
 
+function StoryThumb({ mediaId, title }: { mediaId: string; title: string }) {
+  const [url, setUrl] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  
+  useEffect(() => {
+    let cancelled = false;
+    
+    const loadMedia = async () => {
+      try {
+        const { data } = await supabaseBrowser
+          .from('story_media')
+          .select('processed_url')
+          .eq('id', mediaId)
+          .single();
+        
+        if (!cancelled && data?.processed_url) {
+          setUrl(data.processed_url);
+          setLoading(false);
+          return;
+        }
+        
+        const res = await fetch(`/api/get-media?id=${mediaId}`);
+        const result = await res.json();
+        if (!cancelled) {
+          if (result.url) {
+            setUrl(result.url);
+          } else {
+            setError(true);
+          }
+          setLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setError(true);
+          setLoading(false);
+        }
+      }
+    };
+    
+    loadMedia();
+    return () => { cancelled = true; };
+  }, [mediaId]);
+  
+  if (loading) return <div className={styles.thumbLoading}><div className={styles.spinner} /></div>;
+  if (error) return <span className={styles.videoIcon}>⚠️</span>;
+  return <img src={url} alt={title} className={styles.thumb} onError={() => setError(true)} />;
+}
+
+function VideoThumb({ mediaId, title }: { mediaId: string; title: string }) {
+  const [url, setUrl] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  
+  useEffect(() => {
+    let cancelled = false;
+    
+    const loadMedia = async () => {
+      try {
+        const { data } = await supabaseBrowser
+          .from('story_media')
+          .select('processed_url')
+          .eq('id', mediaId)
+          .single();
+        
+        if (!cancelled && data?.processed_url) {
+          setUrl(data.processed_url);
+          setLoading(false);
+          return;
+        }
+        
+        const res = await fetch(`/api/get-media?id=${mediaId}`);
+        const result = await res.json();
+        if (!cancelled) {
+          if (result.url) {
+            setUrl(result.url);
+          } else {
+            setError(true);
+          }
+          setLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setError(true);
+          setLoading(false);
+        }
+      }
+    };
+    
+    loadMedia();
+    return () => { cancelled = true; };
+  }, [mediaId]);
+  
+  if (loading) return <div className={styles.thumbLoading}><div className={styles.spinner} /></div>;
+  if (error) return <span className={styles.videoIcon}>🎬</span>;
+  
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <video src={url} className={styles.thumb} />
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(220,38,38,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type StoryMedia = { id: string; link: string; type: 'image' | 'video' };
 type StoryMember = { id: string; fullname: string };
 
@@ -426,14 +534,9 @@ export default function StoriesPage() {
                     <div className={styles.cardLeft}>
                       <div className={styles.mediaPreview}>
                         {story.story_media[0]?.type === 'video' ? (
-                          <span className={styles.videoIcon}>🎬</span>
+                          <VideoThumb mediaId={story.story_media[0].id} title={story.title} />
                         ) : story.story_media[0] ? (
-                          <img
-                            src={getFileId(story.story_media[0].link) ? driveImageUrl(getFileId(story.story_media[0].link)!) : story.story_media[0].link}
-                            alt={story.title}
-                            className={styles.thumb}
-                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                          />
+                          <StoryThumb mediaId={story.story_media[0].id} title={story.title} />
                         ) : <span className={styles.videoIcon}>📷</span>}
                       </div>
                       <div className={styles.cardInfo}>

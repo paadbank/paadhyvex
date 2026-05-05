@@ -10,9 +10,31 @@ import styles from './page.module.css';
 
 async function getMediaUrl(mediaId: string): Promise<string> {
   try {
+    // First check if URL exists in database
+    const { data } = await supabaseBrowser
+      .from('story_media')
+      .select('processed_url')
+      .eq('id', mediaId)
+      .single();
+    
+    if (data?.processed_url) {
+      // Verify the URL actually works by attempting to fetch it
+      try {
+        const testResponse = await fetch(data.processed_url, { method: 'HEAD' });
+        if (testResponse.ok) {
+          return data.processed_url;
+        }
+        // If file doesn't exist, fall through to API call
+        console.warn(`File not found in storage for media ${mediaId}, reprocessing...`);
+      } catch {
+        // Network error or file doesn't exist, fall through to API call
+      }
+    }
+    
+    // If no processed_url or file doesn't exist, call API to process
     const res = await fetch(`/api/get-media?id=${mediaId}`);
-    const data = await res.json();
-    return data.url;
+    const result = await res.json();
+    return result.url || '';
   } catch {
     return '';
   }
@@ -20,16 +42,116 @@ async function getMediaUrl(mediaId: string): Promise<string> {
 
 function StoryThumb({ mediaId, title }: { mediaId: string; title: string }) {
   const [url, setUrl] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   
   useEffect(() => {
     let cancelled = false;
-    getMediaUrl(mediaId).then(u => {
-      if (!cancelled) setUrl(u);
-    });
+    
+    const loadMedia = async () => {
+      try {
+        const { data } = await supabaseBrowser
+          .from('story_media')
+          .select('processed_url')
+          .eq('id', mediaId)
+          .single();
+        
+        if (!cancelled && data?.processed_url) {
+          setUrl(data.processed_url);
+          setLoading(false);
+          return;
+        }
+        
+        const res = await fetch(`/api/get-media?id=${mediaId}`);
+        const result = await res.json();
+        if (!cancelled) {
+          if (result.url) {
+            setUrl(result.url);
+          } else {
+            setError(true);
+          }
+          setLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setError(true);
+          setLoading(false);
+        }
+      }
+    };
+    
+    loadMedia();
     return () => { cancelled = true; };
   }, [mediaId]);
   
-  return url ? <img src={url} alt={title} className={styles.thumbImg} /> : <LoadingSpinner />;
+  if (loading) return <div className={styles.thumbVideo}><div className={styles.spinner} /></div>;
+  if (error) return <div className={styles.thumbVideo}><span>⚠️</span></div>;
+  return <img src={url} alt={title} className={styles.thumbImg} />;
+}
+
+function VideoThumb({ mediaId, title }: { mediaId: string; title: string }) {
+  const [url, setUrl] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  
+  useEffect(() => {
+    let cancelled = false;
+    
+    const loadMedia = async () => {
+      try {
+        const { data } = await supabaseBrowser
+          .from('story_media')
+          .select('processed_url')
+          .eq('id', mediaId)
+          .single();
+        
+        if (!cancelled && data?.processed_url) {
+          setUrl(data.processed_url);
+          setLoading(false);
+          return;
+        }
+        
+        const res = await fetch(`/api/get-media?id=${mediaId}`);
+        const result = await res.json();
+        if (!cancelled) {
+          if (result.url) {
+            setUrl(result.url);
+          } else {
+            setError(true);
+          }
+          setLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setError(true);
+          setLoading(false);
+        }
+      }
+    };
+    
+    loadMedia();
+    return () => { cancelled = true; };
+  }, [mediaId]);
+  
+  if (loading) return <div className={styles.thumbVideo}><div className={styles.spinner} /></div>;
+  if (error) return (
+    <div className={styles.thumbVideo}>
+      <div className={styles.thumbPlay}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+      </div>
+    </div>
+  );
+  
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <video src={url} className={styles.thumbImg} />
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+        <div className={styles.thumbPlay}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 type StoryMedia = { id: string; link: string; type: 'image' | 'video' };
@@ -45,6 +167,12 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
+  const [loadingUrls, setLoadingUrls] = useState<Record<string, boolean>>({});
+  const [errorUrls, setErrorUrls] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    setIdx(0);
+  }, [media.map(m => m.id).join(',')]);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 900);
@@ -57,10 +185,36 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
     let cancelled = false;
     const loadMedia = async () => {
       for (const m of media) {
-        if (!mediaUrls[m.id] && !cancelled) {
-          const url = await getMediaUrl(m.id);
-          if (url && !cancelled) {
-            setMediaUrls(prev => ({ ...prev, [m.id]: url }));
+        if (!mediaUrls[m.id] && !loadingUrls[m.id] && !cancelled) {
+          setLoadingUrls(prev => ({ ...prev, [m.id]: true }));
+          
+          try {
+            const { data } = await supabaseBrowser
+              .from('story_media')
+              .select('processed_url')
+              .eq('id', m.id)
+              .single();
+            
+            if (!cancelled && data?.processed_url) {
+              setMediaUrls(prev => ({ ...prev, [m.id]: data.processed_url }));
+              setLoadingUrls(prev => ({ ...prev, [m.id]: false }));
+              continue;
+            }
+            
+            const url = await getMediaUrl(m.id);
+            if (url && !cancelled) {
+              setMediaUrls(prev => ({ ...prev, [m.id]: url }));
+            } else if (!cancelled) {
+              setErrorUrls(prev => ({ ...prev, [m.id]: true }));
+            }
+          } catch {
+            if (!cancelled) {
+              setErrorUrls(prev => ({ ...prev, [m.id]: true }));
+            }
+          } finally {
+            if (!cancelled) {
+              setLoadingUrls(prev => ({ ...prev, [m.id]: false }));
+            }
           }
         }
       }
@@ -79,14 +233,21 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
   }, [videoModalOpen]);
 
   if (media.length === 0) return <div className={styles.detailMediaEmpty}><span>📷</span></div>;
-  const cur = media[idx];
-  const curUrl = mediaUrls[cur.id];
+  
+  const cur = media[idx] || media[0];
+  const curUrl = mediaUrls[cur?.id];
+  const isLoading = loadingUrls[cur?.id];
+  const hasError = errorUrls[cur?.id];
   
   return (
     <>
       <div className={styles.detailCarousel}>
         <div className={styles.detailCarouselFrame}>
-          {!curUrl ? (
+          {isLoading ? (
+            <div className={styles.detailMediaEmpty}><LoadingSpinner /></div>
+          ) : hasError ? (
+            <div className={styles.detailMediaEmpty}><span>⚠️ Failed to load media</span></div>
+          ) : !curUrl ? (
             <div className={styles.detailMediaEmpty}><LoadingSpinner /></div>
           ) : cur.type === 'video' ? (
             isMobile ? (
@@ -312,11 +473,7 @@ export default function StoriesViewPage() {
                   <div className={styles.cardThumb}>
                     {!thumb ? <span className={styles.thumbPlaceholder}>📷</span>
                       : thumb.type === 'video' ? (
-                        <div className={styles.thumbVideo}>
-                          <div className={styles.thumbPlay}>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
-                          </div>
-                        </div>
+                        <VideoThumb mediaId={thumb.id} title={story.title} />
                       ) : (
                         <StoryThumb mediaId={thumb.id} title={story.title} />
                       )}

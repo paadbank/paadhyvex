@@ -688,6 +688,14 @@
 /* ─── VIDEO REEL ─────────────────────────────────────────── */
 .videoReel {
   margin: 0 calc(-2rem);
+}
+
+.container_light .videoReel {
+  background: #1a1a1a;
+  color: #f5f0e8;
+}
+
+.container_dark .videoReel {
   background: #0f0f0f;
   color: #f5f0e8;
 }
@@ -864,7 +872,6 @@
 }
 
 .storiesViewAll {
-  color: #dc2626;
   font-weight: 700;
   font-size: 0.9rem;
   text-decoration: none;
@@ -873,6 +880,14 @@
   transition: opacity 0.2s;
 }
 .storiesViewAll:hover { opacity: 0.7; }
+
+.container_light .storiesViewAll {
+  color: #dc2626;
+}
+
+.container_dark .storiesViewAll {
+  color: #f87171;
+}
 
 .storiesViewAllMobile {
   text-align: center;
@@ -904,8 +919,8 @@
   border: 1px solid transparent;
 }
 
-.storyCard_light { background: #ffffff; box-shadow: 0 1px 8px rgba(0,0,0,0.07); }
-.storyCard_dark  { background: #3a3a3a; box-shadow: 0 1px 8px rgba(0,0,0,0.3); }
+.storyCard_light { background: #ffffff; box-shadow: 0 1px 8px rgba(0,0,0,0.07); color: #2d2d2d; }
+.storyCard_dark  { background: #3a3a3a; box-shadow: 0 1px 8px rgba(0,0,0,0.3); color: #f5f0e8; }
 
 .storyCard:hover {
   transform: translateY(-4px);
@@ -1016,12 +1031,14 @@
   background: linear-gradient(135deg, rgba(220,38,38,0.06) 0%, rgba(248,113,113,0.04) 100%);
   border-top: 1px solid rgba(220,38,38,0.12);
   border-bottom: 1px solid rgba(220,38,38,0.12);
+  color: #2d2d2d;
 }
 
 .founderPreview_dark {
   background: linear-gradient(135deg, rgba(220,38,38,0.1) 0%, rgba(248,113,113,0.06) 100%);
   border-top: 1px solid rgba(220,38,38,0.2);
   border-bottom: 1px solid rgba(220,38,38,0.2);
+  color: #f5f0e8;
 }
 
 .founderPreviewInner {
@@ -1060,12 +1077,20 @@
   display: inline-block;
   padding: 0.2rem 0.7rem;
   border-radius: 2rem;
-  background: rgba(220,38,38,0.12);
-  color: #dc2626;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   margin-bottom: 0.4rem;
+}
+
+.founderPreview_light .founderPreviewBadge {
+  background: rgba(220,38,38,0.12);
+  color: #dc2626;
+}
+
+.founderPreview_dark .founderPreviewBadge {
+  background: rgba(220,38,38,0.25);
+  color: #f87171;
 }
 
 .founderPreviewTitle {
@@ -1101,7 +1126,6 @@
 .founderPreviewToggle {
   background: none;
   border: none;
-  color: #dc2626;
   font-weight: 700;
   font-size: 0.875rem;
   cursor: pointer;
@@ -1110,14 +1134,29 @@
 }
 .founderPreviewToggle:hover { opacity: 0.7; }
 
-.founderPreviewLink {
+.founderPreview_light .founderPreviewToggle {
   color: #dc2626;
+}
+
+.founderPreview_dark .founderPreviewToggle {
+  color: #f87171;
+}
+
+.founderPreviewLink {
   font-weight: 700;
   font-size: 0.875rem;
   text-decoration: none;
   transition: opacity 0.2s;
 }
 .founderPreviewLink:hover { opacity: 0.7; }
+
+.founderPreview_light .founderPreviewLink {
+  color: #dc2626;
+}
+
+.founderPreview_dark .founderPreviewLink {
+  color: #f87171;
+}
 
 /* Video Modal (Mobile) */
 .videoModal {

@@ -49,8 +49,12 @@
   font-weight: 700;
 }
 
-.logoIcon {
-  font-size: 2rem;
+.logoImage {
+  width: 2.25rem;
+  height: 2.25rem;
+  object-fit: contain;
+  display: block;
+  flex-shrink: 0;
 }
 
 .navLinks {

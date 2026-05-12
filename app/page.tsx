@@ -247,6 +247,7 @@ export default function LandingPage() {
   const { theme, toggleTheme } = useTheme();
   const { t, lang, setLang } = useLanguage();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const logoSrc = '/paadhyvex_mark.svg';
   const [stats, setStats] = useState({
     beneficiaries: 0,
     padsDistributed: 0,
@@ -281,7 +282,7 @@ export default function LandingPage() {
       <nav className={styles.nav}>
         <div className={styles.navContent}>
           <div className={styles.logo}>
-            <span className={styles.logoIcon}>🩸</span>
+            <img src={logoSrc} alt="" className={styles.logoImage} />
             <span className={styles.logoText}>PAADhyvex</span>
           </div>
           <div className={styles.navLinks}>
@@ -324,7 +325,7 @@ export default function LandingPage() {
         <div className={`${styles.drawer} ${styles[`drawer_${theme}`]}`}>
           <div className={styles.drawerHeader}>
             <div className={styles.drawerLogo}>
-              <span className={styles.logoIcon}>🩸</span>
+              <img src={logoSrc} alt="" className={styles.logoImage} />
               <span>PAADhyvex</span>
             </div>
             <button onClick={() => setIsMenuOpen(false)} className={styles.closeBtn}>

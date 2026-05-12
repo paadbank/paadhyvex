@@ -1,0 +1,23 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">PAADhyvex mark</title>
+  <desc id="desc">A red circular mark with a white sanitary pad symbol.</desc>
+  <circle cx="128" cy="128" r="116" fill="#f70b0b"/>
+  <path
+    d="M93 99C80 101 72 111 72 126V151C72 166 80 176 93 178C97 154 98 123 93 99Z"
+    fill="#fff"
+  />
+  <path
+    d="M163 99C176 101 184 111 184 126V151C184 166 176 176 163 178C159 154 158 123 163 99Z"
+    fill="#fff"
+  />
+  <path
+    d="M128 22C105 22 93 40 99 64C108 99 108 157 99 192C93 216 105 234 128 234C151 234 163 216 157 192C148 157 148 99 157 64C163 40 151 22 128 22Z"
+    fill="#fff"
+  />
+  <path
+    d="M128 35C113 35 105 48 109 65C118 102 118 154 109 191C105 208 113 221 128 221C143 221 151 208 147 191C138 154 138 102 147 65C151 48 143 35 128 35Z"
+    stroke="#f70b0b"
+    stroke-width="7"
+    stroke-linejoin="round"
+  />
+</svg>

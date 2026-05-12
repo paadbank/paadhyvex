@@ -18,6 +18,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "PAADhyvex",
   description: "Menstrual Health Management Platform",
+  icons: {
+    icon: [{ url: "/paadhyvex_mark.svg", type: "image/svg+xml" }],
+  },
 };
 
 export default function RootLayout({

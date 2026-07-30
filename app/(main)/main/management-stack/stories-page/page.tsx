@@ -6,112 +6,33 @@ import { useTheme } from '@/context/ThemeContext';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner';
 import EmptyRecord from '@/components/EmptyRecord/EmptyRecord';
+import MediaUploader, { mediaItemFromExisting, type MediaItem } from '@/components/MediaUploader/MediaUploader';
+import { deleteStoryMedia } from '@/lib/media/upload';
 import styles from './page.module.css';
 
-function StoryThumb({ mediaId, title }: { mediaId: string; title: string }) {
-  const [url, setUrl] = useState('');
-  const [loading, setLoading] = useState(true);
+function StoryThumb({ media, title }: { media: { processed_url: string | null; provider: string | null }; title: string }) {
   const [error, setError] = useState(false);
-  
-  useEffect(() => {
-    let cancelled = false;
-    
-    const loadMedia = async () => {
-      try {
-        const { data } = await supabaseBrowser
-          .from('story_media')
-          .select('processed_url')
-          .eq('id', mediaId)
-          .single();
-        
-        if (!cancelled && data?.processed_url) {
-          setUrl(data.processed_url);
-          setLoading(false);
-          return;
-        }
-        
-        const res = await fetch(`/api/get-media?id=${mediaId}`);
-        const result = await res.json();
-        if (!cancelled) {
-          if (result.url) {
-            setUrl(result.url);
-          } else {
-            setError(true);
-          }
-          setLoading(false);
-        }
-      } catch {
-        if (!cancelled) {
-          setError(true);
-          setLoading(false);
-        }
-      }
-    };
-    
-    loadMedia();
-    return () => { cancelled = true; };
-  }, [mediaId]);
-  
-  if (loading) return <div className={styles.thumbLoading}><div className={styles.spinner} /></div>;
+  if (!media.processed_url) return <span className={styles.videoIcon}>{media.provider === 'failed' ? '⚠️' : '⏳'}</span>;
   if (error) return <span className={styles.videoIcon}>⚠️</span>;
-  return <img src={url} alt={title} className={styles.thumb} onError={() => setError(true)} />;
+  return <img src={media.processed_url} alt={title} className={styles.thumb} onError={() => setError(true)} />;
 }
 
-function VideoThumb({ mediaId, title }: { mediaId: string; title: string }) {
-  const [url, setUrl] = useState('');
+function VideoThumb({ media, title }: { media: { processed_url: string | null; provider: string | null }; title: string }) {
   const [thumbnail, setThumbnail] = useState('');
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  
-  useEffect(() => {
-    let cancelled = false;
-    
-    const loadMedia = async () => {
-      try {
-        const { data } = await supabaseBrowser
-          .from('story_media')
-          .select('processed_url')
-          .eq('id', mediaId)
-          .single();
-        
-        if (!cancelled && data?.processed_url) {
-          setUrl(data.processed_url);
-          return;
-        }
-        
-        const res = await fetch(`/api/get-media?id=${mediaId}`);
-        const result = await res.json();
-        if (!cancelled) {
-          if (result.url) {
-            setUrl(result.url);
-          } else {
-            setError(true);
-            setLoading(false);
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setError(true);
-          setLoading(false);
-        }
-      }
-    };
-    
-    loadMedia();
-    return () => { cancelled = true; };
-  }, [mediaId]);
-  
+  const url = media.processed_url;
+
   // Generate thumbnail from video
   useEffect(() => {
-    if (!url || error) return;
-    
+    if (!url) return;
+
     const video = document.createElement('video');
     video.crossOrigin = 'anonymous';
     video.preload = 'metadata';
     video.muted = true;
     video.playsInline = true;
     video.src = url;
-    
+
     const captureFrame = () => {
       try {
         const canvas = document.createElement('canvas');
@@ -120,40 +41,31 @@ function VideoThumb({ mediaId, title }: { mediaId: string; title: string }) {
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const thumbData = canvas.toDataURL('image/jpeg', 0.8);
-          setThumbnail(thumbData);
-          setLoading(false);
+          setThumbnail(canvas.toDataURL('image/jpeg', 0.8));
         }
       } catch (err) {
         console.error('Failed to capture video frame:', err);
         setError(true);
-        setLoading(false);
       }
       video.remove();
     };
-    
+
     video.addEventListener('loadeddata', captureFrame);
-    video.addEventListener('error', () => {
-      setError(true);
-      setLoading(false);
-      video.remove();
-    });
+    video.addEventListener('error', () => { setError(true); video.remove(); });
     video.currentTime = 0.1;
-    
+
     return () => {
       video.removeEventListener('loadeddata', captureFrame);
       video.remove();
     };
-  }, [url, error]);
-  
-  if (loading) {
-    return <div className={styles.thumbLoading}><div className={styles.spinner} /></div>;
-  }
-  
+  }, [url]);
+
+  if (!url) return <span className={styles.videoIcon}>{media.provider === 'failed' ? '⚠️' : '⏳'}</span>;
+
   if (error || !thumbnail) {
     return <span className={styles.videoIcon}>🎬</span>;
   }
-  
+
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <img src={thumbnail} alt={title} className={styles.thumb} />
@@ -166,7 +78,7 @@ function VideoThumb({ mediaId, title }: { mediaId: string; title: string }) {
   );
 }
 
-type StoryMedia = { id: string; link: string; type: 'image' | 'video' };
+type StoryMedia = { id: string; link: string; type: 'image' | 'video'; processed_url: string | null; storage_path: string | null; provider: string | null };
 type StoryMember = { id: string; fullname: string };
 
 type Story = {
@@ -188,6 +100,7 @@ type FounderStory = {
   founder_name: string;
   founder_date: string;
   image_url: string;
+  storage_path: string | null;
 };
 
 const EMPTY_FORM = {
@@ -198,64 +111,7 @@ const EMPTY_FORM = {
   is_published: true,
 };
 
-type MediaDraft = { link: string; type: 'image' | 'video' };
 type MemberDraft = { fullname: string };
-
-function getFileId(url: string) {
-  const m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-  return m ? m[1] : null;
-}
-function driveImageUrl(id: string) {
-  return `https://lh3.googleusercontent.com/d/${id}`;
-}
-function resolveUrl(url: string, type: 'image' | 'video') {
-  const id = getFileId(url);
-  if (id) return type === 'video' ? `https://drive.google.com/file/d/${id}/preview` : driveImageUrl(id);
-  return url;
-}
-
-function MediaPreview({ url, type }: { url: string; type: 'image' | 'video' }) {
-  const [show, setShow] = useState(false);
-  const [imgError, setImgError] = useState(false);
-  useEffect(() => { setShow(false); setImgError(false); }, [url]);
-  const id = getFileId(url);
-  const isValid = !!id || url.startsWith('http');
-  if (!isValid || !url) return null;
-  const resolved = resolveUrl(url, type);
-  return (
-    <div className={styles.inlinePreview}>
-      {!show ? (
-        <button type="button" className={styles.previewTrigger} onClick={() => setShow(true)}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-          </svg>
-          Preview
-        </button>
-      ) : (
-        <>
-          <div className={styles.inlinePreviewMedia}>
-            {type === 'video' && id ? (
-              <iframe src={resolved} className={styles.inlinePreviewIframe} allow="autoplay; fullscreen" allowFullScreen title="preview" />
-            ) : !imgError ? (
-              <img src={resolved} alt="preview" className={styles.inlinePreviewImg} onError={() => setImgError(true)} />
-            ) : (
-              <div className={styles.previewFallback}>
-                <p>Cannot display preview.</p>
-                <a href={url} target="_blank" rel="noreferrer" className={styles.previewOpenLink}>Open in browser ↗</a>
-              </div>
-            )}
-          </div>
-          <button type="button" className={styles.previewClear} onClick={() => { setShow(false); setImgError(false); }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-            Clear preview
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
 
 export default function StoriesPage() {
   const nav = useNav();
@@ -268,7 +124,7 @@ export default function StoriesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Story | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [mediaDrafts, setMediaDrafts] = useState<MediaDraft[]>([{ link: '', type: 'image' }]);
+  const [mediaDrafts, setMediaDrafts] = useState<MediaItem[]>([]);
   const [memberDrafts, setMemberDrafts] = useState<MemberDraft[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -276,9 +132,9 @@ export default function StoriesPage() {
   const [founder, setFounder] = useState<FounderStory | null>(null);
   const [loadingFounder, setLoadingFounder] = useState(true);
   const [editingFounder, setEditingFounder] = useState(false);
-  const [founderForm, setFounderForm] = useState({ title: '', description: '', founder_name: '', founder_date: '', image_url: '' });
+  const [founderForm, setFounderForm] = useState({ title: '', description: '', founder_name: '', founder_date: '' });
+  const [founderImage, setFounderImage] = useState<MediaItem[]>([]);
   const [savingFounder, setSavingFounder] = useState(false);
-  const [showFounderImgPreview, setShowFounderImgPreview] = useState(false);
 
   useEffect(() => { loadStories(); loadFounder(); }, []);
 
@@ -286,15 +142,25 @@ export default function StoriesPage() {
     setLoadingFounder(true);
     const { data } = await supabaseBrowser.from('founder_story').select('*').limit(1).single();
     setFounder(data || null);
-    if (data) setFounderForm({ title: data.title, description: data.description, founder_name: data.founder_name, founder_date: data.founder_date || '', image_url: data.image_url || '' });
+    if (data) {
+      setFounderForm({ title: data.title, description: data.description, founder_name: data.founder_name, founder_date: data.founder_date || '' });
+      setFounderImage(data.image_url ? [mediaItemFromExisting(data.image_url, 'image', data.storage_path, 'supabase')] : []);
+    }
     setLoadingFounder(false);
   };
 
   const saveFounder = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingFounder(true);
-    if (founder) await supabaseBrowser.from('founder_story').update(founderForm).eq('id', founder.id);
-    else await supabaseBrowser.from('founder_story').insert(founderForm);
+    const img = founderImage[0];
+    const payload = {
+      ...founderForm,
+      image_url: img?.url || '',
+      processed_image_url: img?.url || null,
+      storage_path: img?.storagePath || null,
+    };
+    if (founder) await supabaseBrowser.from('founder_story').update(payload).eq('id', founder.id);
+    else await supabaseBrowser.from('founder_story').insert(payload);
     setSavingFounder(false);
     setEditingFounder(false);
     loadFounder();
@@ -305,7 +171,8 @@ export default function StoriesPage() {
     const { data } = await supabaseBrowser
       .from('stories')
       .select('*, story_media(*), story_members(*)')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .order('created_at', { foreignTable: 'story_media', ascending: true });
     setStories((data || []) as Story[]);
     setLoadingPosts(false);
   };
@@ -313,7 +180,7 @@ export default function StoriesPage() {
   const openCreate = () => {
     setEditing(null);
     setForm(EMPTY_FORM);
-    setMediaDrafts([{ link: '', type: 'image' }]);
+    setMediaDrafts([]);
     setMemberDrafts([]);
     setShowForm(true);
   };
@@ -321,13 +188,14 @@ export default function StoriesPage() {
   const openEdit = (story: Story) => {
     setEditing(story);
     setForm({ title: story.title, location: story.location || '', story_text: story.story_text, category: story.category || '', is_published: story.is_published });
-    setMediaDrafts(story.story_media.length > 0 ? story.story_media.map(m => ({ link: m.link, type: m.type })) : [{ link: '', type: 'image' }]);
+    setMediaDrafts(story.story_media.map(m => mediaItemFromExisting(m.processed_url || m.link, m.type, m.storage_path, m.provider as any)));
     setMemberDrafts(story.story_members.map(m => ({ fullname: m.fullname })));
     setShowForm(true);
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (mediaDrafts.some(m => m.status === 'uploading')) return;
     setSaving(true);
     let storyId: string;
     if (editing) {
@@ -340,9 +208,12 @@ export default function StoriesPage() {
       const { data } = await supabaseBrowser.from('stories').insert(form).select('id').single();
       storyId = data!.id;
     }
-    const validMedia = mediaDrafts.filter(m => m.link.trim());
+    const validMedia = mediaDrafts.filter(m => m.status === 'done');
     if (validMedia.length > 0) {
-      await supabaseBrowser.from('story_media').insert(validMedia.map(m => ({ story_id: storyId, link: m.link.trim(), type: m.type })));
+      await supabaseBrowser.from('story_media').insert(validMedia.map(m => ({
+        story_id: storyId, link: m.url, type: m.type,
+        processed_url: m.url, storage_path: m.storagePath, provider: m.provider,
+      })));
     }
     const validMembers = memberDrafts.filter(m => m.fullname.trim());
     if (validMembers.length > 0) {
@@ -360,19 +231,10 @@ export default function StoriesPage() {
 
   const deleteStory = async (id: string) => {
     if (!window.confirm('Delete this story?')) return;
+    const story = stories.find(s => s.id === id);
+    if (story) await Promise.all(story.story_media.map(m => deleteStoryMedia({ provider: m.provider, storagePath: m.storage_path })));
     await supabaseBrowser.from('stories').delete().eq('id', id);
     loadStories();
-  };
-
-  // Media draft helpers
-  const addMedia = () => setMediaDrafts(d => [...d, { link: '', type: 'image' }]);
-  const removeMedia = (i: number) => setMediaDrafts(d => d.filter((_, idx) => idx !== i));
-  const updateMedia = (i: number, patch: Partial<MediaDraft>) =>
-    setMediaDrafts(d => d.map((m, idx) => idx === i ? { ...m, ...patch } : m));
-  const moveMedia = (i: number, dir: -1 | 1) => {
-    const next = i + dir;
-    if (next < 0 || next >= mediaDrafts.length) return;
-    setMediaDrafts(d => { const a = [...d]; [a[i], a[next]] = [a[next], a[i]]; return a; });
   };
 
   // Member draft helpers
@@ -430,7 +292,7 @@ export default function StoriesPage() {
                       <div className={styles.founderMeta}>
                         {founder.image_url && (
                           <img
-                            src={getFileId(founder.image_url) ? driveImageUrl(getFileId(founder.image_url)!) : founder.image_url}
+                            src={founder.image_url}
                             alt={founder.founder_name}
                             className={styles.founderAvatar}
                           />
@@ -462,10 +324,8 @@ export default function StoriesPage() {
                     <input value={founderForm.founder_date} onChange={e => setFounderForm({ ...founderForm, founder_date: e.target.value })} placeholder="e.g. November 2024" />
                   </div>
                   <div className={`${styles.field} ${styles.fullWidth}`}>
-                    <label>Founder Image (Google Drive link or URL)</label>
-                    <input value={founderForm.image_url} onChange={e => { setFounderForm({ ...founderForm, image_url: e.target.value }); setShowFounderImgPreview(false); }} placeholder="https://drive.google.com/file/d/FILE_ID/view" />
-                    <span className={styles.hint}>Share as &quot;Anyone with the link&quot; and paste here.</span>
-                    {founderForm.image_url && <MediaPreview url={founderForm.image_url} type="image" />}
+                    <label>Founder Image</label>
+                    <MediaUploader items={founderImage} onChange={setFounderImage} theme={theme} maxItems={1} accept="image/*" label="Add founder photo" />
                   </div>
                   <div className={`${styles.field} ${styles.fullWidth}`}>
                     <label>Story / Description *</label>
@@ -506,35 +366,11 @@ export default function StoriesPage() {
                   <textarea value={form.story_text} onChange={e => setForm({ ...form, story_text: e.target.value })} rows={5} required placeholder="Tell the story behind this photo or video..." />
                 </div>
 
-                {/* ── MEDIA TABLE ── */}
+                {/* ── MEDIA ── */}
                 <div className={`${styles.field} ${styles.fullWidth}`}>
                   <label>Media</label>
-                  <span className={styles.hint}>Share each file as &quot;Anyone with the link&quot; then paste the Drive link.</span>
-                  <div className={styles.mediaTable}>
-                    {mediaDrafts.map((m, i) => (
-                      <div key={i} className={`${styles.mediaRow} ${styles[`mediaRow_${theme}`]}`}>
-                        <select value={m.type} onChange={e => updateMedia(i, { type: e.target.value as 'image' | 'video' })} className={styles.typeSelect}>
-                          <option value="image">Image</option>
-                          <option value="video">Video</option>
-                        </select>
-                        <input
-                          value={m.link}
-                          onChange={e => updateMedia(i, { link: e.target.value })}
-                          placeholder="https://drive.google.com/file/d/FILE_ID/view"
-                          className={styles.linkInput}
-                        />
-                        <div className={styles.rowControls}>
-                          <button type="button" className={styles.arrowBtn} onClick={() => moveMedia(i, -1)} disabled={i === 0} title="Move up">‹</button>
-                          <button type="button" className={styles.arrowBtn} onClick={() => moveMedia(i, 1)} disabled={i === mediaDrafts.length - 1} title="Move down">›</button>
-                          <button type="button" className={styles.removeRowBtn} onClick={() => removeMedia(i)} title="Remove">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                          </button>
-                        </div>
-                        {m.link && <div className={styles.mediaRowPreview}><MediaPreview url={m.link} type={m.type} /></div>}
-                      </div>
-                    ))}
-                  </div>
-                  <button type="button" className={styles.addRowBtn} onClick={addMedia}>+ Add Media</button>
+                  <MediaUploader items={mediaDrafts} onChange={setMediaDrafts} theme={theme} />
+                  {mediaDrafts.some(m => m.status === 'uploading') && <span className={styles.hint}>Waiting for uploads to finish…</span>}
                 </div>
 
                 {/* ── MEMBERS TABLE ── */}
@@ -570,7 +406,7 @@ export default function StoriesPage() {
                 </div>
                 <div className={styles.formActions}>
                   <button type="button" onClick={() => setShowForm(false)} className={styles.cancelBtn}>Cancel</button>
-                  <button type="submit" className={styles.submitButton} disabled={saving}>{saving ? 'Saving…' : editing ? 'Save Changes' : 'Add Story'}</button>
+                  <button type="submit" className={styles.submitButton} disabled={saving || mediaDrafts.some(m => m.status === 'uploading')}>{saving ? 'Saving…' : editing ? 'Save Changes' : 'Add Story'}</button>
                 </div>
               </form>
             )}
@@ -584,9 +420,9 @@ export default function StoriesPage() {
                     <div className={styles.cardLeft}>
                       <div className={styles.mediaPreview}>
                         {story.story_media[0]?.type === 'video' ? (
-                          <VideoThumb mediaId={story.story_media[0].id} title={story.title} />
+                          <VideoThumb media={story.story_media[0]} title={story.title} />
                         ) : story.story_media[0] ? (
-                          <StoryThumb mediaId={story.story_media[0].id} title={story.title} />
+                          <StoryThumb media={story.story_media[0]} title={story.title} />
                         ) : <span className={styles.videoIcon}>📷</span>}
                       </div>
                       <div className={styles.cardInfo}>

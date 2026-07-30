@@ -6,116 +6,22 @@ import { useTheme } from '@/context/ThemeContext';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import styles from './stories.module.css';
 
-async function getMediaUrl(mediaId: string): Promise<string> {
-  try {
-    const res = await fetch(`/api/get-media?id=${mediaId}`);
-    const data = await res.json();
-    return data.url;
-  } catch {
-    return '';
-  }
-}
-
-function FounderImage({ founderId, imageUrl, name }: { founderId: string; imageUrl: string; name: string }) {
-  const [url, setUrl] = useState('');
-  const [loading, setLoading] = useState(true);
-  
-  useEffect(() => {
-    let cancelled = false;
-    
-    // Check if already processed
-    const checkProcessed = async () => {
-      try {
-        const { data } = await supabaseBrowser
-          .from('founder_story')
-          .select('processed_image_url')
-          .eq('id', founderId)
-          .single();
-        
-        if (!cancelled && data?.processed_image_url) {
-          setUrl(data.processed_image_url);
-          setLoading(false);
-          return;
-        }
-        
-        // If not processed, fetch from API
-        const res = await fetch(`/api/get-founder-image?id=${founderId}`);
-        const result = await res.json();
-        if (!cancelled) {
-          setUrl(result.url);
-          setLoading(false);
-        }
-      } catch {
-        if (!cancelled) {
-          setUrl(imageUrl);
-          setLoading(false);
-        }
-      }
-    };
-    
-    checkProcessed();
-    return () => { cancelled = true; };
-  }, [founderId, imageUrl]);
-  
-  if (loading) return <div className={styles.spinner} />;
-  return <img src={url} alt={name} className={styles.founderBannerAvatar} />;
-}
-
-function VideoThumb({ mediaId, title }: { mediaId: string; title: string }) {
-  const [url, setUrl] = useState('');
+function VideoThumb({ media, title }: { media: StoryMedia; title: string }) {
   const [thumbnail, setThumbnail] = useState('');
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  
-  useEffect(() => {
-    let cancelled = false;
-    
-    const loadMedia = async () => {
-      try {
-        const { data } = await supabaseBrowser
-          .from('story_media')
-          .select('processed_url')
-          .eq('id', mediaId)
-          .single();
-        
-        if (!cancelled && data?.processed_url) {
-          setUrl(data.processed_url);
-          return;
-        }
-        
-        const res = await fetch(`/api/get-media?id=${mediaId}`);
-        const result = await res.json();
-        if (!cancelled) {
-          if (result.url) {
-            setUrl(result.url);
-          } else {
-            setError(true);
-            setLoading(false);
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setError(true);
-          setLoading(false);
-        }
-      }
-    };
-    
-    loadMedia();
-    return () => { cancelled = true; };
-  }, [mediaId]);
-  
+  const url = media.processed_url;
+
   // Generate thumbnail from video
   useEffect(() => {
-    if (!url || error) return;
-    
+    if (!url) return;
+
     const video = document.createElement('video');
     video.crossOrigin = 'anonymous';
     video.preload = 'metadata';
     video.muted = true;
     video.playsInline = true;
     video.src = url;
-    
+
     const captureFrame = () => {
       try {
         const canvas = document.createElement('canvas');
@@ -124,36 +30,29 @@ function VideoThumb({ mediaId, title }: { mediaId: string; title: string }) {
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const thumbData = canvas.toDataURL('image/jpeg', 0.8);
-          setThumbnail(thumbData);
-          setLoading(false);
+          setThumbnail(canvas.toDataURL('image/jpeg', 0.8));
         }
       } catch (err) {
         console.error('Failed to capture video frame:', err);
         setError(true);
-        setLoading(false);
       }
       video.remove();
     };
-    
+
     video.addEventListener('loadeddata', captureFrame);
-    video.addEventListener('error', () => {
-      setError(true);
-      setLoading(false);
-      video.remove();
-    });
+    video.addEventListener('error', () => { setError(true); video.remove(); });
     video.currentTime = 0.1;
-    
+
     return () => {
       video.removeEventListener('loadeddata', captureFrame);
       video.remove();
     };
-  }, [url, error]);
-  
-  if (loading) {
-    return <div className={styles.videoThumb}><div className={styles.spinner} /></div>;
+  }, [url]);
+
+  if (!url) {
+    return <div className={styles.videoThumb}><span>{media.provider === 'failed' ? '⚠️' : ''}</span></div>;
   }
-  
+
   if (error || !thumbnail) {
     return (
       <div className={styles.videoThumb}>
@@ -163,7 +62,7 @@ function VideoThumb({ mediaId, title }: { mediaId: string; title: string }) {
       </div>
     );
   }
-  
+
   return (
     <div className={styles.videoThumbWrap}>
       <img src={thumbnail} alt={title} className={styles.media} />
@@ -176,58 +75,14 @@ function VideoThumb({ mediaId, title }: { mediaId: string; title: string }) {
   );
 }
 
-function StoryThumb({ mediaId, title }: { mediaId: string; title: string }) {
-  const [url, setUrl] = useState('');
-  const [loading, setLoading] = useState(true);
+function StoryThumb({ media, title }: { media: StoryMedia; title: string }) {
   const [error, setError] = useState(false);
-  
-  useEffect(() => {
-    let cancelled = false;
-    
-    const loadMedia = async () => {
-      try {
-        // Check database first
-        const { data } = await supabaseBrowser
-          .from('story_media')
-          .select('processed_url')
-          .eq('id', mediaId)
-          .single();
-        
-        if (!cancelled && data?.processed_url) {
-          setUrl(data.processed_url);
-          setLoading(false);
-          return;
-        }
-        
-        // If not processed, fetch from API
-        const res = await fetch(`/api/get-media?id=${mediaId}`);
-        const result = await res.json();
-        if (!cancelled) {
-          if (result.url) {
-            setUrl(result.url);
-          } else {
-            setError(true);
-          }
-          setLoading(false);
-        }
-      } catch {
-        if (!cancelled) {
-          setError(true);
-          setLoading(false);
-        }
-      }
-    };
-    
-    loadMedia();
-    return () => { cancelled = true; };
-  }, [mediaId]);
-  
-  if (loading) return <div className={styles.videoThumb}><div className={styles.spinner} /></div>;
+  if (!media.processed_url) return <div className={styles.videoThumb}><span>{media.provider === 'failed' ? '⚠️' : ''}</span></div>;
   if (error) return <div className={styles.videoThumb}><span>⚠️</span></div>;
-  return <img src={url} alt={title} className={styles.media} loading="lazy" />;
+  return <img src={media.processed_url} alt={title} className={styles.media} loading="lazy" onError={() => setError(true)} />;
 }
 
-type StoryMedia = { id: string; link: string; type: 'image' | 'video' };
+type StoryMedia = { id: string; link: string; type: 'image' | 'video'; processed_url: string | null; provider: string | null };
 type StoryMember = { id: string; fullname: string };
 type Story = {
   id: string; title: string; location: string; story_text: string;
@@ -241,9 +96,6 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
   const [idx, setIdx] = useState(0);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
-  const [loadingUrls, setLoadingUrls] = useState<Record<string, boolean>>({});
-  const [errorUrls, setErrorUrls] = useState<Record<string, boolean>>({});
   const [videoThumbnails, setVideoThumbnails] = useState<Record<string, string>>({});
 
   // Reset carousel index when story changes
@@ -258,94 +110,40 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    const loadMedia = async () => {
-      for (const m of media) {
-        if (!mediaUrls[m.id] && !loadingUrls[m.id] && !cancelled) {
-          setLoadingUrls(prev => ({ ...prev, [m.id]: true }));
-          
-          try {
-            const { data } = await supabaseBrowser
-              .from('story_media')
-              .select('processed_url')
-              .eq('id', m.id)
-              .single();
-            
-            if (!cancelled && data?.processed_url) {
-              setMediaUrls(prev => ({ ...prev, [m.id]: data.processed_url }));
-              setLoadingUrls(prev => ({ ...prev, [m.id]: false }));
-              continue;
-            }
-            
-            const url = await getMediaUrl(m.id);
-            if (url && !cancelled) {
-              setMediaUrls(prev => ({ ...prev, [m.id]: url }));
-            } else if (!cancelled) {
-              setErrorUrls(prev => ({ ...prev, [m.id]: true }));
-            }
-          } catch {
-            if (!cancelled) {
-              setErrorUrls(prev => ({ ...prev, [m.id]: true }));
-            }
-          } finally {
-            if (!cancelled) {
-              setLoadingUrls(prev => ({ ...prev, [m.id]: false }));
-            }
-          }
-        }
-      }
-    };
-    loadMedia();
-    return () => { cancelled = true; };
-  }, [media.map(m => m.id).join(',')]);
-
   // Generate video thumbnails
   useEffect(() => {
-    const generateThumbnails = async () => {
-      for (const m of media) {
-        if (m.type === 'video' && mediaUrls[m.id] && !videoThumbnails[m.id]) {
-          const video = document.createElement('video');
-          video.crossOrigin = 'anonymous';
-          video.preload = 'metadata';
-          video.muted = true;
-          video.playsInline = true;
-          video.src = mediaUrls[m.id];
-          
-          const captureFrame = () => {
-            try {
-              const canvas = document.createElement('canvas');
-              canvas.width = video.videoWidth || 640;
-              canvas.height = video.videoHeight || 360;
-              const ctx = canvas.getContext('2d');
-              if (ctx) {
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                const thumbData = canvas.toDataURL('image/jpeg', 0.8);
-                setVideoThumbnails(prev => ({ ...prev, [m.id]: thumbData }));
-                // Mark as loaded by removing from loading state
-                setLoadingUrls(prev => ({ ...prev, [m.id]: false }));
-              }
-            } catch (err) {
-              console.error('Failed to capture video frame:', err);
-              setErrorUrls(prev => ({ ...prev, [m.id]: true }));
-              setLoadingUrls(prev => ({ ...prev, [m.id]: false }));
+    for (const m of media) {
+      if (m.type === 'video' && m.processed_url && !videoThumbnails[m.id]) {
+        const video = document.createElement('video');
+        video.crossOrigin = 'anonymous';
+        video.preload = 'metadata';
+        video.muted = true;
+        video.playsInline = true;
+        video.src = m.processed_url;
+
+        const captureFrame = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 360;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const thumbData = canvas.toDataURL('image/jpeg', 0.8);
+              setVideoThumbnails(prev => ({ ...prev, [m.id]: thumbData }));
             }
-            video.remove();
-          };
-          
-          video.addEventListener('loadeddata', captureFrame);
-          video.addEventListener('error', () => {
-            setErrorUrls(prev => ({ ...prev, [m.id]: true }));
-            setLoadingUrls(prev => ({ ...prev, [m.id]: false }));
-            video.remove();
-          });
-          video.currentTime = 0.1;
-        }
+          } catch (err) {
+            console.error('Failed to capture video frame:', err);
+          }
+          video.remove();
+        };
+
+        video.addEventListener('loadeddata', captureFrame);
+        video.addEventListener('error', () => video.remove());
+        video.currentTime = 0.1;
       }
-    };
-    
-    generateThumbnails();
-  }, [media.map(m => m.id).join(','), Object.keys(mediaUrls).join(',')]);
+    }
+  }, [media.map(m => m.id).join(',')]);
 
   useEffect(() => {
     if (videoModalOpen) {
@@ -361,20 +159,17 @@ function MediaCarousel({ media, title }: { media: StoryMedia[]; title: string })
       <span>📷</span>
     </div>
   );
-  
+
   const cur = media[idx] || media[0];
-  const curUrl = mediaUrls[cur?.id];
-  const isLoading = loadingUrls[cur?.id];
-  const hasError = errorUrls[cur?.id];
+  const curUrl = cur?.processed_url;
+  const hasError = !curUrl && cur?.provider === 'failed';
   const curThumbnail = videoThumbnails[cur?.id];
-  
+
   return (
     <>
       <div className={styles.detailCarousel}>
         <div className={styles.detailCarouselFrame}>
-          {isLoading ? (
-            <div className={styles.detailMediaEmpty}><div className={styles.spinner} /></div>
-          ) : hasError ? (
+          {hasError ? (
             <div className={styles.detailMediaEmpty}><span>⚠️ Failed to load media</span></div>
           ) : !curUrl ? (
             <div className={styles.detailMediaEmpty}><div className={styles.spinner} /></div>
@@ -514,6 +309,7 @@ export default function StoriesPage() {
   useEffect(() => {
     supabaseBrowser.from('stories').select('*, story_media(*), story_members(*)')
       .eq('is_published', true).order('created_at', { ascending: false })
+      .order('created_at', { foreignTable: 'story_media', ascending: true })
       .then(({ data }) => { setStories((data || []) as Story[]); setLoading(false); });
     supabaseBrowser.from('founder_story').select('*').limit(1).single()
       .then(({ data }) => setFounder(data || null));
@@ -593,7 +389,7 @@ export default function StoriesPage() {
           <div className={styles.founderBannerInner}>
             <div className={styles.founderBannerLeft}>
               {founder.image_url && (
-                <FounderImage founderId={founder.id} imageUrl={founder.image_url} name={founder.founder_name} />
+                <img src={founder.image_url} alt={founder.founder_name} className={styles.founderBannerAvatar} />
               )}
               <div>
                 <span className={styles.founderBannerBadge}>✦ Founder&apos;s Story</span>
@@ -643,11 +439,11 @@ export default function StoriesPage() {
                     <div className={styles.videoThumb}><div className={styles.playBtn}><svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg></div></div>
                   ) : thumb.type === 'video' ? (
                     <>
-                      <VideoThumb mediaId={thumb.id} title={story.title} />
+                      <VideoThumb media={thumb} title={story.title} />
                       <div className={styles.videoBadge}><svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>Video</div>
                     </>
                   ) : (
-                    <StoryThumb mediaId={thumb.id} title={story.title} />
+                    <StoryThumb media={thumb} title={story.title} />
                   )}
                   <div className={styles.cardOverlay}>
                     {story.category && <span className={styles.tag}>{story.category}</span>}

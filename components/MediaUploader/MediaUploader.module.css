@@ -1,0 +1,128 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 1.75rem 1rem;
+  border-radius: 10px;
+  border: 1.5px dashed #d4cfc4;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.dropzone_light { color: #2d2d2d; background: #f9f9f9; }
+.dropzone_dark { color: #f5f0e8; background: #1e1e1e; border-color: #555; }
+
+.dropzone:hover,
+.dropzoneActive {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.06);
+}
+
+.dropzoneHint {
+  font-weight: 400;
+  font-size: 0.75rem;
+  opacity: 0.6;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.75rem;
+}
+
+.tile {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid;
+}
+
+.tile_light { background: #f0f0f0; border-color: #e5e7eb; }
+.tile_dark { background: #1a1a1a; border-color: #404040; }
+
+.tileMedia {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.videoBadge {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tileOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tileError {
+  background: rgba(127, 29, 29, 0.75);
+}
+
+.tileError span {
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0 0.5rem;
+  text-align: center;
+}
+
+.progressRing {
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.tileControls {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 3px;
+}
+
+.tileControls button {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.tileControls button:hover:not(:disabled) { background: rgba(0, 0, 0, 0.8); }
+.tileControls button:disabled { opacity: 0.3; cursor: default; }
+
+.tileRemove:hover:not(:disabled) { background: #dc2626 !important; }

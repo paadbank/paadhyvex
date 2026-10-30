@@ -1,23 +1,12 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useTheme } from '@/context/ThemeContext';
-import { useLanguage } from '@/context/LanguageContext';
+import { SiteFooter, SiteHeader } from '@/components/public/site';
 import styles from '../public-page.module.css';
 
 export default function TermsPage() {
-  const router = useRouter();
-  const { theme } = useTheme();
-  const { t } = useLanguage();
-
   return (
-    <div className={`${styles.page} ${styles[`page_${theme}`]}`}>
-      <nav className={styles.nav}>
-        <button onClick={() => router.push('/')} className={styles.backBtn}>
-          <span>←</span>
-          <span className={styles.backText}>{t('back') || 'Back'}</span>
-        </button>
-      </nav>
+    <div className={styles.page}>
+      <SiteHeader />
 
       <div className={styles.hero}>
         <h1 className={styles.title}>Terms of Service</h1>
@@ -86,7 +75,7 @@ export default function TermsPage() {
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>Limitation of Liability</h2>
           <p className={styles.text}>
-            PAADhyvex is provided "as is" without warranties. We are not liable for any damages arising from your use of the service. 
+            PAADhyvex is provided &quot;as is&quot; without warranties. We are not liable for any damages arising from your use of the service. 
             The information provided is for educational purposes and should not replace professional medical advice.
           </p>
         </div>
@@ -111,6 +100,7 @@ export default function TermsPage() {
           </p>
         </div>
       </div>
+      <SiteFooter />
     </div>
   );
 }

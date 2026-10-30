@@ -1,4 +1,4 @@
-# PAAD Hyvex - Menstrual Health Management Platform
+# PAADhyvex - Menstrual Health Management Platform
 
 A comprehensive Next.js 14+ application for managing menstrual health, pad distribution, expenses, and reporting with role-based access control.
 
@@ -278,3 +278,8 @@ For issues or questions, contact the development team or create an issue in the 
 ## License
 
 © 2025 PAAD Bank. All rights reserved.
+
+## Keeping Supabase awake
+
+Supabase pauses a free project after about a week without database activity. A daily job on cron-job.org
+calls `GET /api/keep-alive` on the production site, which runs one small read.

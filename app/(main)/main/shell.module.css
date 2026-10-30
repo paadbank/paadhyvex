@@ -1,0 +1,58 @@
+/* The tab stacks beside the SideBar (wide screens) or above the NavigationBar (phones). Each page
+   scrolls itself and the shell never does. `--nav-height` is the room a page leaves at its foot so
+   its last row scrolls clear of the tab bar. */
+
+.shell {
+  --nav-height: 68px;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+.shell[data-tabs-hidden] {
+  --nav-height: 0px;
+}
+
+.row {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.side {
+  flex: none;
+  height: 100%;
+  z-index: 20;
+}
+
+.stacks {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.navWrap {
+  flex: none;
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--color-surface);
+}
+
+@media (min-width: 801px) {
+  .shell {
+    --nav-height: 0px;
+  }
+
+  .navWrap {
+    display: none;
+  }
+}
+
+@media (max-width: 800px) {
+  .side {
+    display: none;
+  }
+}

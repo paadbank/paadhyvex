@@ -1,10 +1,11 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Session } from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
 import { supabaseBrowser } from '@/lib/supabase/client';
-import AuthBlocker from '@/components/AuthBlocker/AuthBlocker';
+import { Mark } from '@/components/ui/logo';
+import { Loading } from '@/components/ui/page';
 
 interface AuthContextType {
   initialized: boolean;
@@ -23,6 +24,8 @@ export function useAuthContext() {
 const PUBLIC_ROUTES = ['/', '/privacy', '/terms', '/about', '/stories'];
 // Routes only for unauthenticated users (logged-in users get bounced to /main)
 const AUTH_ROUTES = ['/login', '/signup', '/forgot-password'];
+// The emailed reset link signs the person in, and they must stay here to choose a password.
+const RESET_ROUTE = '/forgot-password/reset-password';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -31,68 +34,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
 
   const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
-  const isAuthRoute = AUTH_ROUTES.some(r => pathname.startsWith(r));
+  const isAuthRoute = pathname !== RESET_ROUTE && AUTH_ROUTES.some((r) => pathname.startsWith(r));
   const isProtectedRoute = !isPublicRoute && !isAuthRoute;
 
   useEffect(() => {
     let mounted = true;
 
-    const initializeAuth = async () => {
-      try {
-        const { data: { session: initialSession } } = await supabaseBrowser.auth.getSession();
-
-        if (mounted) {
-          setSession(initialSession);
-          setInitialized(true);
-
-          if (initialSession) {
-            // Logged in — redirect away from auth pages and public pages that have in-app equivalents
-            if (isAuthRoute) {
-              router.replace('/main');
-            } else if (pathname === '/stories') {
-              router.replace('/main');
-            }
-          } else {
-            // Not logged in — redirect away from protected routes
-            if (isProtectedRoute) {
-              router.replace('/login');
-            }
-          }
-        }
-
-        const { data: { subscription } } = supabaseBrowser.auth.onAuthStateChange(
-          (_event, newSession) => {
-            if (!mounted) return;
-            setSession(newSession);
-
-            if (newSession) {
-              // Just signed in — go to main if on auth page
-              if (isAuthRoute) router.replace('/main');
-            } else {
-              // Just signed out — go to login if on protected route
-              if (isProtectedRoute) router.replace('/login');
-            }
-          }
-        );
-
-        return () => subscription.unsubscribe();
-      } catch (error) {
-        console.error('[AUTH] Error:', error);
-        if (mounted) setInitialized(true);
+    supabaseBrowser.auth.getSession().then(({ data: { session: initial } }) => {
+      if (!mounted) return;
+      setSession(initial);
+      setInitialized(true);
+      if (initial) {
+        if (isAuthRoute || pathname === '/stories') router.replace('/main');
+      } else if (isProtectedRoute) {
+        router.replace('/login');
       }
-    };
+    }).catch((error) => {
+      console.error('[AUTH] Error:', error);
+      if (mounted) setInitialized(true);
+    });
 
-    const cleanup = initializeAuth();
+    const { data: { subscription } } = supabaseBrowser.auth.onAuthStateChange((_event, next) => {
+      if (!mounted) return;
+      setSession(next);
+      if (next) {
+        if (isAuthRoute) router.replace('/main');
+      } else if (isProtectedRoute) {
+        router.replace('/login');
+      }
+    });
 
     return () => {
       mounted = false;
-      cleanup?.then(unsub => unsub?.());
+      subscription.unsubscribe();
     };
   }, [pathname]);
 
+  // A public page is drawn straight away; only pages that depend on the session wait for it.
+  const ready = isPublicRoute || initialized;
+
   return (
     <AuthContext.Provider value={{ initialized, session }}>
-      <AuthBlocker>{children}</AuthBlocker>
+      {ready ? children : (
+        <div style={{ display: 'grid', placeItems: 'center', alignContent: 'center', gap: 'var(--space-4)', minHeight: '100dvh' }}>
+          <Mark size={48} />
+          <Loading />
+        </div>
+      )}
     </AuthContext.Provider>
   );
 }

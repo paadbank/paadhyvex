@@ -1,85 +1,41 @@
 'use client';
 
-import { useNav } from '@/lib/NavigationStack';
-import { useState, useEffect } from 'react';
-import { useTheme } from '@/context/ThemeContext';
-import { Notification } from '@/models/ExpenseRecord';
+import { useNav, usePageLifecycle } from '@academix-admin/navigation-stack';
 import { supabaseBrowser } from '@/lib/supabase/client';
-import { useDemandState } from '@/lib/state-stack';
-import EmptyRecord from '@/components/EmptyRecord/EmptyRecord';
-import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner';
-import styles from './page.module.css';
+import { changed, must, useNotifications } from '@/lib/stacks/data';
+import { dateTime } from '@/lib/format';
+import { PageScaffold, PageState, statusOf } from '@/components/ui/page';
+import { List, Row } from '@/components/ui/display';
+import { Button } from '@/components/ui/controls';
+import { useSubmit } from '@/components/ui/dialogs';
 
 export default function NotificationsPage() {
   const nav = useNav();
-  const { theme } = useTheme();
-  const [notifications, demandNotifications] = useDemandState<Notification[]>([], {
-    key: 'notifications',
-    persist: true,
-    ttl: 60
-  });
-  const [loading, setLoading] = useState(true);
+  const notifications = useNotifications();
+  const { submit, dialog } = useSubmit();
 
-  useEffect(() => {
-    loadNotifications();
-  }, []);
+  usePageLifecycle(nav, { onResume: () => notifications.reload() }, [notifications.reload]);
 
-  const loadNotifications = async () => {
-    setLoading(true);
-    try {
-      await demandNotifications(async ({ set }) => {
-        const { data: { user } } = await supabaseBrowser.auth.getUser();
-        if (!user) return;
-
-        const { data, error } = await supabaseBrowser
-          .from('notifications')
-          .select('*')
-          .eq('recipient_id', user.id)
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        set(data?.map(d => Notification.from(d)) || []);
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const markAsRead = async (id: string) => {
-    await supabaseBrowser
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('id', id);
-    loadNotifications();
-  };
+  const markRead = (id: string) =>
+    submit(async () => {
+      must(await supabaseBrowser.from('notifications').update({ is_read: true }).eq('id', id));
+      changed('notifications');
+    });
 
   return (
-    <main className={`${styles.container} ${styles[`container_${theme}`]}`}>
-      <div className={styles.content}>
-        <div className={styles.topSection}>
-          <h1 className={styles.title}>Notifications</h1>
-        </div>
-        {loading ? (
-          <LoadingSpinner />
-        ) : notifications.length === 0 ? (
-          <EmptyRecord message="No notifications" onReload={loadNotifications} theme={theme} />
-        ) : (
-          notifications.map(notif => (
-            <div key={notif.id} className={`${styles.card} ${styles[`card_${theme}`]} ${!notif.isRead ? styles.unread : ''}`}>
-              <div className={styles.cardHeader}>
-                <h3>{notif.title}</h3>
-                {!notif.isRead && (
-                  <button onClick={() => markAsRead(notif.id)} className={styles.markButton}>
-                    Mark Read
-                  </button>
-                )}
-              </div>
-              <p className={styles.message}>{notif.message}</p>
-              <span className={styles.time}>{new Date(notif.createdAt).toLocaleString()}</span>
-            </div>
-          ))
+    <PageScaffold title="Alerts">
+      <PageState status={statusOf(notifications, 'alerts', { when: (d) => d.length === 0, title: 'Nothing new', body: 'Updates about your pads and messages will show up here.' })}>
+        {() => (
+          <List>
+            {notifications.data!.map((n) => (
+              <Row key={n.id} title={n.title} meta={<>{n.message}<br />{dateTime(n.created_at)}</>}>
+                {!n.is_read && <Button variant="quiet" onClick={() => markRead(n.id)}>Mark as read</Button>}
+              </Row>
+            ))}
+          </List>
         )}
-      </div>
-    </main>
+      </PageState>
+      {dialog}
+    </PageScaffold>
   );
 }

@@ -9,24 +9,30 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@academix-admin/dialog-viewer": "0.5.0",
+    "@academix-admin/forms": "0.1.0",
+    "@academix-admin/header": "0.2.4",
+    "@academix-admin/navigation-bar": "0.1.5",
+    "@academix-admin/navigation-stack": "1.9.0",
+    "@academix-admin/pin-input": "0.2.0",
+    "@academix-admin/selection-viewer": "0.5.7",
+    "@academix-admin/side-drawer": "0.2.0",
+    "@academix-admin/sidebar": "0.1.1",
+    "@academix-admin/state-stack": "0.6.3",
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.98.0",
     "cloudinary": "^2.10.0",
-    "framer-motion": "^12.35.0",
-    "lottie-react": "^2.4.1",
-    "next": "^16.1.6",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "react-modal-sheet": "^5.3.1"
+    "motion": "13.1.1",
+    "next": "16.4.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
-    "tailwindcss": "^4",
+    "eslint-config-next": "16.4.2",
     "typescript": "^5"
   }
 }

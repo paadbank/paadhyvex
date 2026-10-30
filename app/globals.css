@@ -1,45 +1,183 @@
-
+/*
+ * Design tokens. Every colour, size and duration in the app comes from here; components use CSS
+ * modules and read these variables, and the academix-ui packages receive them through their
+ * layoutProp and colour props.
+ *
+ * The theme is the logo's: black on white with a red that is kept for what matters (the main action,
+ * the active tab, the last letters of the name). Light is the default; `html.dark` flips the roles.
+ */
 :root {
-  --background-light: #ffffff;
-  --foreground-light: #1a1a1a;
-  --primary-light: #dc2626;
-  --primary-hover-light: #b91c1c;
-  --secondary-light: #f5f5f5;
-  --border-light: #e5e7eb;
-  
-  --background-dark: #1a1a1a;
-  --foreground-dark: #ffffff;
-  --primary-dark: #dc2626;
-  --primary-hover-dark: #ef4444;
-  --secondary-dark: #2d2d2d;
-  --border-dark: #404040;
+  /* palette */
+  --red-700: #b91c1c;
+  --red-600: #dc2626;
+  --red-500: #ef4444;
+  --ink: #1a1a1a;
+  --white: #ffffff;
+  --green-700: #15803d;
+  --green-400: #4ade80;
+  --amber-700: #a16207;
+  --amber-300: #fcd34d;
+
+  /* roles: light */
+  --color-bg: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f5f5f5;
+  --color-text: var(--ink);
+  --color-text-muted: #636363;
+  --color-border: #e5e7eb;
+  --color-border-strong: #c9c9c9;
+  --color-accent: var(--red-600);
+  --color-accent-hover: var(--red-700);
+  --color-accent-ink: var(--red-600);
+  --color-accent-text: #ffffff;
+  --color-accent-soft: #fef2f2;
+  --color-positive: var(--green-700);
+  --color-positive-soft: #f0fdf4;
+  --color-caution: var(--amber-700);
+  --color-caution-soft: #fefce8;
+  --shadow-bar: 0 -1px 0 var(--color-border);
+  --shadow-float: 0 8px 24px rgb(0 0 0 / 0.14);
+
+  /* type */
+  --text-xs: 0.8125rem;
+  --text-sm: 0.9375rem;
+  --text-md: 1.0625rem;
+  --text-lg: 1.3125rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.5rem;
+  --text-3xl: clamp(3rem, 12vw, 5.5rem);
+
+  /* space and shape */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+  --tap: 48px;
+  --content-width: 1560px;
+  --site-width: 1240px;
+  --gutter: 16px;
+
+  /* motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 120ms;
+  --duration-base: 220ms;
+
+  color-scheme: light;
 }
 
-html {
-  overflow: -moz-scrollbars-none;
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+:root.dark {
+  --color-bg: #1a1a1a;
+  --color-surface: #242424;
+  --color-surface-sunken: #2d2d2d;
+  --color-text: #f7f7f7;
+  --color-text-muted: #a8a8a8;
+  --color-border: #3a3a3a;
+  --color-border-strong: #555555;
+  --color-accent-hover: var(--red-500);
+  --color-accent-ink: #f87171;
+  --color-accent-soft: rgb(239 68 68 / 0.14);
+  --color-positive: var(--green-400);
+  --color-positive-soft: rgb(74 222 128 / 0.12);
+  --color-caution: var(--amber-300);
+  --color-caution-soft: rgb(252 211 77 / 0.12);
+  --shadow-float: 0 8px 24px rgb(0 0 0 / 0.5);
+
+  color-scheme: dark;
 }
 
-html::-webkit-scrollbar {
-  display: none;
+@media (min-width: 801px) {
+  :root {
+    --gutter: 32px;
+  }
 }
 
-html, body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+@media (min-width: 1280px) {
+  :root {
+    --gutter: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans), system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 100%;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100dvh;
+}
+
+h1,
+h2,
+h3,
+p,
+ul,
+ol,
+figure,
+blockquote {
   margin: 0;
   padding: 0;
-  overflow-x: hidden;
-  background-color: transparent;
-  -webkit-overflow-scrolling: touch;
 }
 
-body.light {
-  background: var(--background-light);
-  color: var(--foreground-light);
+ul,
+ol {
+  list-style: none;
 }
 
-body.dark {
-  background: var(--background-dark);
-  color: var(--foreground-dark);
+/* Form controls don't inherit the page font by default. */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}
+
+img,
+video {
+  display: block;
+  max-width: 100%;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 2px;
 }

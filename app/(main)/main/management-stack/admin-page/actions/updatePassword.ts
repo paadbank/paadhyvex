@@ -1,23 +1,12 @@
 'use server';
 
-import { createClient } from '@supabase/supabase-js';
+import { ADMIN_ROLES, MIN_PASSWORD, NOT_ALLOWED, callerWithRole, serviceClient } from '@/lib/auth/server';
 
-export async function updateUserPassword(userId: string, newPassword: string) {
-  const supabaseAdmin = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    }
-  );
+export async function updateUserPassword(accessToken: string | null, userId: string, newPassword: string): Promise<{ error?: string }> {
+  const caller = await callerWithRole(accessToken, ADMIN_ROLES);
+  if (!caller) return { error: NOT_ALLOWED };
+  if (!newPassword || newPassword.length < MIN_PASSWORD) return { error: `Use a password of at least ${MIN_PASSWORD} characters.` };
 
-  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-    password: newPassword
-  });
-
-  if (error) throw error;
-  return { success: true };
+  const { error } = await serviceClient().auth.admin.updateUserById(userId, { password: newPassword });
+  return error ? { error: error.message } : {};
 }

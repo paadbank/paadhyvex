@@ -1,13 +1,7 @@
 'use client';
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  ReactNode,
-  useEffect,
-  useCallback,
-} from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 
 const STORED_THEMES = ['light', 'dark', 'system'] as const;
 type StoredTheme = (typeof STORED_THEMES)[number];
@@ -29,122 +23,62 @@ const ThemeContext = createContext<ThemeContextProps>({
   cycleTheme: () => {},
 });
 
-const getSystemTheme = (): Theme => {
-  if (typeof window === 'undefined') return 'light';
+/** Runs in <head>, before anything is drawn. Keep it in step with `resolve` below. */
+export const THEME_SCRIPT = `try{var s=localStorage.getItem('theme');var d=s==='dark'||((s===null||s==='system')&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d)}catch(e){}`;
+
+function resolve(stored: StoredTheme): Theme {
+  if (stored !== 'system') return stored;
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-};
+}
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [storedTheme, setStoredTheme] = useState<StoredTheme>('system');
-  const [resolvedTheme, setResolvedTheme] = useState<Theme>('light');
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [theme, setResolved] = useState<Theme>('light');
 
-  // Initialize from localStorage and apply immediately
+  // The class is already right (THEME_SCRIPT); this brings React's copy in line with it.
   useEffect(() => {
-    const initializeTheme = () => {
-      try {
-        const saved = localStorage.getItem('theme') as StoredTheme | null;
-        const initialStoredTheme = saved && STORED_THEMES.includes(saved)
-          ? saved
-          : 'system';
-
-        const initialResolvedTheme = initialStoredTheme === 'system'
-          ? getSystemTheme()
-          : initialStoredTheme;
-
-        // Apply immediately to prevent flash
-        document.documentElement.classList.remove('light', 'dark');
-        document.documentElement.classList.add(initialResolvedTheme);
-        document.body.classList.remove('light', 'dark');
-        document.body.classList.add(initialResolvedTheme);
-
-        setStoredTheme(initialStoredTheme);
-        setResolvedTheme(initialResolvedTheme);
-        setIsInitialized(true);
-      } catch (error) {
-        console.error('Error initializing theme:', error);
-        // Fallback to light theme
-        document.documentElement.classList.add('light');
-        document.body.classList.add('light');
-        setStoredTheme('system');
-        setResolvedTheme('light');
-        setIsInitialized(true);
-      }
-    };
-
-    initializeTheme();
+    let saved: StoredTheme = 'system';
+    try {
+      const value = localStorage.getItem('theme') as StoredTheme | null;
+      if (value && STORED_THEMES.includes(value)) saved = value;
+    } catch {
+      // Storage can be blocked; the system theme still applies.
+    }
+    // localStorage exists only after hydration, so this can't be the initial state.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStoredTheme(saved);
+    setResolved(resolve(saved));
   }, []);
 
-  // Update theme when storedTheme changes
   useEffect(() => {
-    if (!isInitialized) return;
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+  }, [theme]);
 
-    const updateTheme = () => {
-      const newResolvedTheme = storedTheme === 'system' ? getSystemTheme() : storedTheme;
-      setResolvedTheme(newResolvedTheme);
-
-      document.documentElement.classList.remove('light', 'dark');
-      document.documentElement.classList.add(newResolvedTheme);
-      document.body.classList.remove('light', 'dark');
-      document.body.classList.add(newResolvedTheme);
-    };
-
-    updateTheme();
-  }, [storedTheme, isInitialized]);
-
-  // System theme listener
   useEffect(() => {
-    if (!isInitialized || storedTheme !== 'system') return;
-
+    if (storedTheme !== 'system') return;
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const listener = () => {
-      const newResolvedTheme = getSystemTheme();
-      setResolvedTheme(newResolvedTheme);
-      document.documentElement.classList.remove('light', 'dark');
-      document.documentElement.classList.add(newResolvedTheme);
-      document.body.classList.remove('light', 'dark');
-      document.body.classList.add(newResolvedTheme);
-    };
-
+    const listener = () => setResolved(resolve('system'));
     mq.addEventListener('change', listener);
     return () => mq.removeEventListener('change', listener);
-  }, [storedTheme, isInitialized]);
+  }, [storedTheme]);
 
-  const setTheme = useCallback((newTheme: StoredTheme) => {
-    setStoredTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
+  const setTheme = useCallback((next: StoredTheme) => {
+    setStoredTheme(next);
+    setResolved(resolve(next));
+    try {
+      localStorage.setItem('theme', next);
+    } catch {
+      // The choice lasts for this visit.
+    }
   }, []);
 
-  const toggleTheme = useCallback(() => {
-    const currentEffectiveTheme = storedTheme === 'system' ? resolvedTheme : storedTheme;
-    setTheme(currentEffectiveTheme === 'dark' ? 'light' : 'dark');
-  }, [storedTheme, resolvedTheme, setTheme]);
+  const toggleTheme = useCallback(() => setTheme(theme === 'dark' ? 'light' : 'dark'), [theme, setTheme]);
 
   const cycleTheme = useCallback(() => {
-    const index = STORED_THEMES.indexOf(storedTheme);
-    const next = STORED_THEMES[(index + 1) % STORED_THEMES.length];
-    setTheme(next);
+    setTheme(STORED_THEMES[(STORED_THEMES.indexOf(storedTheme) + 1) % STORED_THEMES.length]);
   }, [storedTheme, setTheme]);
 
-  // Don't render children until theme is initialized to prevent flash
-  if (!isInitialized) {
-    return null;
-  }
-
-  return (
-    <ThemeContext.Provider
-      value={{
-        theme: resolvedTheme,
-        storedTheme,
-        setTheme,
-        toggleTheme,
-        cycleTheme,
-      }}
-    >
-      {children}
-    </ThemeContext.Provider>
-  );
+  return <ThemeContext.Provider value={{ theme, storedTheme, setTheme, toggleTheme, cycleTheme }}>{children}</ThemeContext.Provider>;
 };
 
 export const useTheme = () => useContext(ThemeContext);
-

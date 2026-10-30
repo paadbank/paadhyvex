@@ -1,156 +1,131 @@
+/* Reading pages: About, Privacy, Terms and Stories. A serif title and a comfortable measure. */
+
 .page {
   min-height: 100dvh;
-}
-
-.page_light {
-  background: #f5f0e8;
-  color: #2d2d2d;
-}
-
-.page_dark {
-  background: #2d2d2d;
-  color: #f5f0e8;
-}
-
-.nav {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  padding: 1.5rem 2rem;
-  border-bottom: 1px solid rgba(45, 45, 45, 0.1);
-  backdrop-filter: blur(10px);
-}
-
-.page_light .nav {
-  background: rgba(245, 240, 232, 0.95);
-}
-
-.page_dark .nav {
-  background: rgba(45, 45, 45, 0.95);
-  border-bottom-color: rgba(245, 240, 232, 0.1);
-}
-
-.backBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  border-radius: 0.75rem;
-  border: none;
-  background: #dc2626;
-  color: #ffffff;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.backBtn:hover {
-  background: #b91c1c;
-  transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(220, 38, 38, 0.3);
-}
-
-.backText {
-  display: inline;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  color: var(--color-text);
 }
 
 .hero {
-  padding: 4rem 2rem;
-  text-align: center;
-  max-width: 1000px;
+  width: 100%;
+  max-width: 760px;
   margin: 0 auto;
+  padding: var(--space-12) var(--space-4) var(--space-8);
 }
 
 .title {
-  font-size: 3.5rem;
-  font-weight: 800;
-  margin-bottom: 1.5rem;
-  line-height: 1.2;
+  font-family: var(--font-display), serif;
+  font-size: clamp(2.5rem, 9vw, 3.75rem);
+  font-weight: 600;
+  line-height: 1.08;
 }
 
 .subtitle {
-  font-size: 1.5rem;
-  opacity: 0.8;
-  max-width: 700px;
-  margin: 0 auto;
+  max-width: 54ch;
+  margin-top: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-md);
 }
 
 .content {
-  max-width: 1000px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  width: 100%;
+  max-width: 760px;
   margin: 0 auto;
-  padding: 3rem 2rem;
+  padding: 0 var(--space-4);
 }
 
 .section {
-  margin-bottom: 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 .sectionTitle {
-  font-size: 1.75rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
+  font-family: var(--font-display), serif;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .text {
-  line-height: 1.8;
-  opacity: 0.9;
-  margin-bottom: 1rem;
+  max-width: 68ch;
+  font-size: var(--text-md);
+  line-height: 1.65;
 }
 
 .list {
-  list-style: disc;
-  padding-left: 2rem;
-  margin: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  max-width: 68ch;
+  border-top: 1px solid var(--color-border);
 }
 
 .listItem {
-  margin-bottom: 0.5rem;
-  line-height: 1.6;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--text-sm);
+  line-height: 1.5;
 }
 
-@media (max-width: 800px) {
-  .nav {
-    padding: 1rem 1.5rem;
-  }
-  
-  .backBtn {
-    padding: 0.75rem;
-    width: 44px;
-    height: 44px;
-    justify-content: center;
-  }
-  
-  .backText {
-    display: none;
-  }
-  
-  .title {
-    font-size: 2.5rem;
-  }
-  
-  .subtitle {
-    font-size: 1.25rem;
-  }
+.promise {
+  max-width: 26ch;
+  font-family: var(--font-display), serif;
+  font-size: var(--text-xl);
+  line-height: 1.25;
 }
 
-@media (max-width: 500px) {
-  .nav {
-    padding: 1rem;
-  }
-  
-  .hero {
-    padding: 3rem 1.5rem;
-  }
-  
-  .title {
-    font-size: 2rem;
-  }
-  
-  .subtitle {
-    font-size: 1.125rem;
-  }
-  
-  .content {
-    padding: 2rem 1.5rem;
-  }
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.wide {
+  max-width: var(--site-width);
+  padding-inline: var(--gutter);
+}
+
+.stories {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.founder {
+  display: grid;
+  gap: var(--space-4);
+  padding-bottom: var(--space-8);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.founderPhoto {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.founderBy {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.founderText {
+  max-width: 68ch;
+  font-size: var(--text-md);
+  line-height: 1.65;
+  white-space: pre-line;
+}
+
+.detailNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
 }

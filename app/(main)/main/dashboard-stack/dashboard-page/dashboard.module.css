@@ -1,0 +1,14 @@
+.me {
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+}
+
+@media (hover: hover) {
+  .me:hover {
+    outline: 2px solid var(--color-border-strong);
+    outline-offset: 1px;
+  }
+}

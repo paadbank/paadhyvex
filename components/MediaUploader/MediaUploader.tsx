@@ -19,10 +19,9 @@ export function mediaItemFromExisting(url: string, type: MediaKind, storagePath:
   return { clientId: crypto.randomUUID(), url, type, storagePath, provider, status: 'done', progress: 100 };
 }
 
-export default function MediaUploader({ items, onChange, theme, maxItems, accept = 'image/*,video/*', label = 'Add photos or videos' }: {
+export default function MediaUploader({ items, onChange, maxItems, accept = 'image/*,video/*', label = 'Add photos or videos' }: {
   items: MediaItem[];
   onChange: React.Dispatch<React.SetStateAction<MediaItem[]>>;
-  theme: string;
   maxItems?: number;
   accept?: string;
   label?: string;
@@ -92,7 +91,7 @@ export default function MediaUploader({ items, onChange, theme, maxItems, accept
     <div className={styles.wrap}>
       {!atCapacity && (
         <div
-          className={`${styles.dropzone} ${styles[`dropzone_${theme}`]} ${dragOver ? styles.dropzoneActive : ''}`}
+          className={`${styles.dropzone} ${dragOver ? styles.dropzoneActive : ''}`}
           onClick={() => inputRef.current?.click()}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
@@ -102,7 +101,7 @@ export default function MediaUploader({ items, onChange, theme, maxItems, accept
             <path d="M12 5v14M5 12h14" />
           </svg>
           <span>{label}</span>
-          <span className={styles.dropzoneHint}>Click or drag files here — up to 100MB</span>
+          <span className={styles.dropzoneHint}>Choose or drag files, up to 100MB</span>
           <input
             ref={inputRef}
             type="file"
@@ -117,7 +116,7 @@ export default function MediaUploader({ items, onChange, theme, maxItems, accept
       {items.length > 0 && (
         <div className={styles.grid}>
           {items.map((item, i) => (
-            <div key={item.clientId} className={`${styles.tile} ${styles[`tile_${theme}`]}`}>
+            <div key={item.clientId} className={styles.tile}>
               {item.type === 'video' ? (
                 <video src={item.url} className={styles.tileMedia} muted />
               ) : (
@@ -138,7 +137,7 @@ export default function MediaUploader({ items, onChange, theme, maxItems, accept
 
               {item.status === 'error' && (
                 <div className={`${styles.tileOverlay} ${styles.tileError}`} title={item.error}>
-                  <span>⚠️ Failed</span>
+                  <span>Failed</span>
                 </div>
               )}
 

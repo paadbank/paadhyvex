@@ -1,128 +1,57 @@
 'use client';
 
-import { useNav } from '@/lib/NavigationStack';
-import { useState, useEffect } from 'react';
-import { useTheme } from '@/context/ThemeContext';
+import type { ReactNode } from 'react';
+import { useNav } from '@academix-admin/navigation-stack';
 import { useLanguage } from '@/context/LanguageContext';
-import { supabaseBrowser } from '@/lib/supabase/client';
-import styles from './page.module.css';
+import { useProfile } from '@/lib/stacks/data';
+import { useGirlsToReach } from '@/lib/reach';
+import { count } from '@/lib/format';
+import { PageScaffold, PageState, statusOf } from '@/components/ui/page';
+import { List, Row } from '@/components/ui/display';
+import { BookIcon, CameraIcon, ChartIcon, ChatIcon, PackageIcon, PenIcon, PeopleIcon, ReceiptIcon, ShieldIcon, WalletIcon } from '@/components/ui/icons';
+
+type Item = { route: string; title: string; meta: string; icon: ReactNode };
 
 export default function ManagementHome() {
   const nav = useNav();
-  const { theme } = useTheme();
   const { t } = useLanguage();
-  const [userRole, setUserRole] = useState('');
+  const profile = useProfile();
+  const role = profile.data?.role;
+  const isAdmin = role === 'admin' || role === 'super_admin';
+  const girlsToReach = useGirlsToReach();
 
-  useEffect(() => {
-    loadUserRole();
-  }, []);
-
-  // Handle cross-stack navigation from dashboard stories strip
-  useEffect(() => {
-    const handler = () => nav.push('stories_view_page');
-    window.addEventListener('nav:stories', handler);
-    return () => window.removeEventListener('nav:stories', handler);
-  }, [nav]);
-
-  const loadUserRole = async () => {
-    const { data: { user } } = await supabaseBrowser.auth.getUser();
-    if (!user) return;
-
-    const { data: profile } = await supabaseBrowser
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    setUserRole(profile?.role || '');
-  };
-
-  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
-  const isLogger = userRole === 'logger';
-  const isSales = userRole === 'sales';
+  const items: Item[] = [
+    { route: 'distribution_page', title: t('distributions') || 'Distributions', meta: 'Pad distributions and deliveries', icon: <PackageIcon /> },
+    ...(isAdmin
+      ? [
+          { route: 'stories_page', title: 'Stories', meta: 'Field photos, videos and the founder story', icon: <CameraIcon /> },
+          { route: 'expenses_page', title: t('expenses') || 'Expenses', meta: 'Money given and spent', icon: <WalletIcon /> },
+          { route: 'reports_page', title: t('reports') || 'Reports', meta: 'Figures and CSV exports', icon: <ChartIcon /> },
+          { route: 'admin_page', title: 'Users', meta: 'Accounts, roles and approvals', icon: <ShieldIcon /> },
+          { route: 'reach_page', title: 'Girls yet to reach', meta: girlsToReach === null ? 'Set the X shown on the public site' : `${count(girlsToReach)} on the public site`, icon: <PeopleIcon /> },
+        ]
+      : [{ route: 'stories_view_page', title: 'Stories', meta: 'Field stories and updates', icon: <CameraIcon /> }]),
+    { route: 'messaging_page', title: t('messages') || 'Messages', meta: 'Contacts and groups', icon: <ChatIcon /> },
+    ...(role === 'logger' ? [{ route: 'log_cycle_page', title: 'Log cycles', meta: 'Log a cycle for a beneficiary', icon: <PenIcon /> }] : []),
+    ...(role === 'sales'
+      ? [
+          { route: 'transactions_page', title: 'Transactions', meta: 'Purchases and sales', icon: <ReceiptIcon /> },
+          { route: 'ledger_page', title: 'Ledger', meta: 'Expenses and delivery costs together', icon: <BookIcon /> },
+        ]
+      : []),
+  ];
 
   return (
-    <div className={`${styles.container} ${styles[`container_${theme}`]}`}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>{t('management') || 'Management'}</h1>
-        <p className={styles.subtitle}>Access all management features</p>
-      </header>
-
-      <main className={styles.main}>
-        <div className={styles.grid}>
-          <div className={`${styles.card} ${styles[`card_${theme}`]}`} onClick={() => nav.push('distribution_page')}>
-            <span className={styles.icon}>📦</span>
-            <h3>{t('distributions') || 'Distributions'}</h3>
-            <p>Manage pad distributions and deliveries</p>
-          </div>
-
-          {isAdmin && (
-            <>
-              <div className={`${styles.card} ${styles[`card_${theme}`]}`} onClick={() => nav.push('stories_page')}>
-                <span className={styles.icon}>📸</span>
-                <h3>Stories</h3>
-                <p>Manage field photos, videos and stories</p>
-              </div>
-
-              <div className={`${styles.card} ${styles[`card_${theme}`]}`} onClick={() => nav.push('expenses_page')}>
-                <span className={styles.icon}>💰</span>
-                <h3>{t('expenses') || 'Expenses'}</h3>
-                <p>Track expenses and budgets</p>
-              </div>
-
-              <div className={`${styles.card} ${styles[`card_${theme}`]}`} onClick={() => nav.push('reports_page')}>
-                <span className={styles.icon}>📊</span>
-                <h3>{t('reports') || 'Reports'}</h3>
-                <p>View analytics and reports</p>
-              </div>
-
-              <div className={`${styles.card} ${styles[`card_${theme}`]}`} onClick={() => nav.push('admin_page')}>
-                <span className={styles.icon}>🛡️</span>
-                <h3>{t('admin') || 'Admin'}</h3>
-                <p>User management and settings</p>
-              </div>
-            </>
-          )}
-
-          {!isAdmin && (
-            <div className={`${styles.card} ${styles[`card_${theme}`]}`} onClick={() => nav.push('stories_view_page')}>
-              <span className={styles.icon}>📸</span>
-              <h3>Stories</h3>
-              <p>Read field stories and updates</p>
-            </div>
-          )}
-
-          <div className={`${styles.card} ${styles[`card_${theme}`]}`} onClick={() => nav.push('messaging_page')}>
-            <span className={styles.icon}>💬</span>
-            <h3>{t('messages') || 'Messages'}</h3>
-            <p>Communication and messaging</p>
-          </div>
-
-          {isLogger && (
-            <div className={`${styles.card} ${styles[`card_${theme}`]}`} onClick={() => nav.push('log_cycle_page')}>
-              <span className={styles.icon}>📝</span>
-              <h3>Log Cycles</h3>
-              <p>Log cycles for beneficiaries</p>
-            </div>
-          )}
-
-          {isSales && (
-            <>
-              <div className={`${styles.card} ${styles[`card_${theme}`]}`} onClick={() => nav.push('transactions_page')}>
-                <span className={styles.icon}>🛒</span>
-                <h3>Transactions</h3>
-                <p>Log purchases and sales</p>
-              </div>
-
-              <div className={`${styles.card} ${styles[`card_${theme}`]}`} onClick={() => nav.push('ledger_page')}>
-                <span className={styles.icon}>📚</span>
-                <h3>Ledger</h3>
-                <p>View comprehensive ledger</p>
-              </div>
-            </>
-          )}
-        </div>
-      </main>
-    </div>
+    <PageScaffold title="Manage">
+      <PageState status={statusOf(profile, 'your workspace')}>
+        {() => (
+          <List>
+            {items.map((item) => (
+              <Row key={item.route} leading={item.icon} title={item.title} meta={item.meta} onClick={() => nav.push(item.route)} />
+            ))}
+          </List>
+        )}
+      </PageState>
+    </PageScaffold>
   );
 }

@@ -1,0 +1,84 @@
+.messages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.message {
+  display: flex;
+  flex-direction: column;
+  align-self: flex-start;
+  gap: 2px;
+  max-width: min(82%, 560px);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-sm);
+  background: var(--color-surface-sunken);
+}
+
+.message[data-mine] {
+  align-self: flex-end;
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+.message p {
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.message time {
+  align-self: flex-end;
+  font-size: 0.6875rem;
+  opacity: 0.72;
+}
+
+.sender {
+  color: var(--color-accent-ink);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.empty {
+  margin: var(--space-8) auto;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.composer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) calc(var(--space-2) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.composer input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-bg);
+  font-size: 1rem;
+}
+
+.composer button {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+.composer button:disabled {
+  opacity: 0.45;
+}

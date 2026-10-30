@@ -1,0 +1,20 @@
+.wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  color: var(--color-text);
+  font-family: var(--font-display), serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.wordmark[data-size='lg'] {
+  font-size: 1.75rem;
+}
+
+.vex {
+  color: var(--color-accent-ink);
+  font-family: var(--font-sans), sans-serif;
+  font-weight: 500;
+}

@@ -1,65 +1,39 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { supabaseBrowser } from '@/lib/supabase/client';
-import { useTheme } from '@/context/ThemeContext';
-import styles from './request-reset.module.css';
+import { AuthFrame, FormError } from '@/components/public/auth-frame';
+import { Button, Form, TextField } from '@/components/ui/controls';
 
 export default function RequestResetPage() {
-  const { theme } = useTheme();
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const send = async () => {
+    setSending(true);
     setError('');
-
-    const { error: resetError } = await supabaseBrowser.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/forgot-password/reset-password`,
-    });
-
-    if (resetError) {
-      setError(resetError.message);
-    } else {
-      setSent(true);
-    }
+    const { error: failure } = await supabaseBrowser.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/forgot-password/reset-password` });
+    setSending(false);
+    if (failure) setError(failure.message);
+    else setSent(true);
   };
 
+  const backToLogin = <Link href="/login">Back to login</Link>;
+
   if (sent) {
-    return (
-      <div className={`${styles.container} ${styles[theme]}`}>
-        <div className={styles.card}>
-          <h1>Check Your Email</h1>
-          <p>We've sent password reset instructions to {email}</p>
-          <a href="/login" className={styles.link}>Back to Login</a>
-        </div>
-      </div>
-    );
+    return <AuthFrame title="Check your email" subtitle={`We've sent password reset instructions to ${email}.`} footer={backToLogin}>{null}</AuthFrame>;
   }
 
   return (
-    <div className={`${styles.container} ${styles[theme]}`}>
-      <div className={styles.card}>
-        <h1>Reset Password</h1>
-        <p className={styles.subtitle}>Enter your email to receive reset instructions</p>
-        
-        <form onSubmit={handleSubmit} className={styles.form}>
-          {error && <div className={styles.error}>{error}</div>}
-          
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email"
-            required
-          />
-          
-          <button type="submit">Send Reset Link</button>
-        </form>
-
-        <a href="/login" className={styles.link}>Back to Login</a>
-      </div>
-    </div>
+    <AuthFrame title="Reset your password" subtitle="Enter your email and we'll send you a reset link." footer={backToLogin}>
+      <Form onSubmit={send}>
+        <TextField label="Email" type="email" keyboardType="email" autoComplete="email" value={email} onChange={setEmail} required />
+        {error && <FormError>{error}</FormError>}
+        <Button type="submit" full busy={sending}>Send reset link</Button>
+      </Form>
+    </AuthFrame>
   );
 }

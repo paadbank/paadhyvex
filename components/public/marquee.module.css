@@ -1,0 +1,67 @@
+.marquee {
+  --marquee-gap: var(--space-3);
+  overflow: hidden;
+}
+
+.track {
+  display: flex;
+  gap: var(--marquee-gap);
+  width: max-content;
+  animation: slide var(--seconds) linear infinite;
+}
+
+.group {
+  display: flex;
+  flex: none;
+  gap: var(--marquee-gap);
+}
+
+.marquee[data-direction='right'] .track {
+  animation-direction: reverse;
+}
+
+.marquee[data-direction='up'],
+.marquee[data-direction='down'] {
+  height: 100%;
+}
+
+.marquee[data-direction='up'] .track,
+.marquee[data-direction='down'] .track {
+  flex-direction: column;
+  width: 100%;
+  animation-name: rise;
+}
+
+.marquee[data-direction='up'] .group,
+.marquee[data-direction='down'] .group {
+  flex-direction: column;
+}
+
+.marquee[data-direction='down'] .track {
+  animation-direction: reverse;
+}
+
+@media (hover: hover) {
+  .marquee:hover .track {
+    animation-play-state: paused;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track {
+    animation: none;
+  }
+}
+
+/* Half the track plus half a gap is exactly one copy and the space after it. */
+@keyframes slide {
+  to {
+    transform: translateX(calc(-50% - var(--marquee-gap) / 2));
+  }
+}
+
+@keyframes rise {
+  to {
+    transform: translateY(calc(-50% - var(--marquee-gap) / 2));
+  }
+}

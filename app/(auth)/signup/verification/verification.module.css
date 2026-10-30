@@ -1,129 +1,18 @@
-.container {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
+.pins {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--space-2);
 }
 
-.container.light {
-  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
-}
-
-.container.dark {
-  background: linear-gradient(135deg, #7f1d1d 0%, #450a0a 100%);
-}
-
-.card {
-  background: white;
-  padding: 50px 40px;
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+.pin {
   width: 100%;
-  max-width: 450px;
-  text-align: center;
-}
-
-.dark .card {
-  background: #2a2a2a;
-  color: #f5f0e8;
-}
-
-.card h1 {
-  font-size: 28px;
-  font-weight: 700;
-  margin: 0 0 8px 0;
-  color: #dc2626;
-}
-
-.dark .card h1 {
-  color: #f87171;
-}
-
-.subtitle {
-  color: #6b7280;
-  margin: 0 0 32px 0;
-  font-size: 14px;
-}
-
-.dark .subtitle {
-  color: #9ca3af;
-}
-
-.codeInputs {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  margin-bottom: 32px;
-}
-
-.codeInput {
-  width: 50px;
-  height: 60px;
-  text-align: center;
-  font-size: 24px;
-  font-weight: 700;
-  border: 2px solid #d1d5db;
-  border-radius: 8px;
-}
-
-.dark .codeInput {
-  background: #3a3a3a;
-  border-color: #4a4a4a;
-  color: #f5f0e8;
-}
-
-.codeInput:focus {
-  outline: none;
-  border-color: #dc2626;
-}
-
-.button {
-  width: 100%;
-  padding: 14px;
-  background: #dc2626;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
+  min-width: 0;
+  height: 56px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-lg);
   font-weight: 600;
-  cursor: pointer;
-  margin-bottom: 16px;
-}
-
-.button:hover:not(:disabled) {
-  background: #b91c1c;
-}
-
-.button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.error {
-  padding: 12px;
-  background: #fee2e2;
-  color: #991b1b;
-  border-radius: 8px;
-  font-size: 14px;
-  margin-bottom: 16px;
-}
-
-.dark .error {
-  background: #7f1d1d;
-  color: #fecaca;
-}
-
-.link {
-  color: #dc2626;
-  text-decoration: none;
-  font-size: 14px;
-}
-
-.link:hover {
-  text-decoration: underline;
-}
-
-.dark .link {
-  color: #f87171;
+  text-align: center;
 }

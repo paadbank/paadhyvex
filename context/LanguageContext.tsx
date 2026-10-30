@@ -49,7 +49,6 @@ const LanguageContext = createContext<LanguageContextProps>({
 
 export const LanguageProvider = ({ children }: { children: ReactNode }) => {
   const [lang, setLangState] = useState<SupportedLang>('en');
-  const [isInitialized, setIsInitialized] = useState(false);
 
   // Initialize from localStorage
   useEffect(() => {
@@ -66,8 +65,6 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
       } catch (error) {
         console.error('Error initializing language:', error);
         setLangState('en');
-      } finally {
-        setIsInitialized(true);
       }
     };
 
@@ -142,10 +139,6 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
 
 
   // Don't render children until language is initialized
-  if (!isInitialized) {
-    return null;
-  }
-
   return (
     <LanguageContext.Provider value={{ lang, setLang, t, tNode }}>
       {children}

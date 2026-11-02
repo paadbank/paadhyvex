@@ -15,7 +15,6 @@ export const metadata: Metadata = {
   title: { default: 'PAADhyvex', template: '%s | PAADhyvex' },
   description: 'Free sanitary pads, cycle tracking and support for girls and women in Sabogida Ora and beyond. One pad at a time.',
   applicationName: 'PAADhyvex',
-  icons: { icon: [{ url: '/paadhyvex_mark.svg', type: 'image/svg+xml' }] },
   formatDetection: { telephone: false },
 };
 

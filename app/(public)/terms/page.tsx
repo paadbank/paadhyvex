@@ -90,7 +90,7 @@ export default function TermsPage() {
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>Contact</h2>
           <p className={styles.text}>
-            For questions about these Terms of Service, contact us at support@paadhyvex.org
+            For questions about these Terms of Service, contact us at paadbank906@gmail.com
           </p>
         </div>
 

@@ -23,4 +23,4 @@ export const SANS_LETTERS_FROM = 6;
 
 export const TAGLINE = 'One pad at a time.';
 
-export const CONTACT_EMAIL = 'support@paadhyvex.org';
+export const CONTACT_EMAIL = 'paadbank906@gmail.com';

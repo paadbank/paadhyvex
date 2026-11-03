@@ -181,3 +181,20 @@ video {
   outline: 2px solid var(--color-accent-ink);
   outline-offset: 2px;
 }
+
+/*
+ * The side drawer package scopes its scroll lock under its own id, so it never reaches <body>, and it
+ * sizes itself at 100vh, which on a phone is taller than the visible area (the browser's toolbar covers
+ * the bottom). These two rules finish the job from outside.
+ */
+html:has(body.sidedrawer-body-scroll-lock),
+body.sidedrawer-body-scroll-lock {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.sidedrawer {
+  height: 100dvh !important;
+  max-height: 100dvh;
+  overscroll-behavior: contain;
+}

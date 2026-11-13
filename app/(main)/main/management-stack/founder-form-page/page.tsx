@@ -5,6 +5,7 @@ import { useNav } from '@academix-admin/navigation-stack';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { changed, must, useFounderStory } from '@/lib/stacks/data';
 import MediaUploader, { mediaItemFromExisting, type MediaItem } from '@/components/MediaUploader/MediaUploader';
+import { providerForUrl } from '@/lib/media/upload';
 import { PageScaffold } from '@/components/ui/page';
 import { Section } from '@/components/ui/display';
 import { useSeed, Button, Form, TextArea, TextField } from '@/components/ui/controls';
@@ -22,7 +23,7 @@ export default function FounderFormPage() {
 
   useSeed(existing, (existing) => {
     setValues({ title: existing.title, description: existing.description, founder_name: existing.founder_name, founder_date: existing.founder_date ?? '' });
-    setImage(existing.image_url ? [mediaItemFromExisting(existing.image_url, 'image', existing.storage_path, 'supabase')] : []);
+    setImage(existing.image_url ? [mediaItemFromExisting(existing.image_url, 'image', existing.storage_path, providerForUrl(existing.image_url))] : []);
   });
 
   const save = () =>

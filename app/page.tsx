@@ -33,7 +33,7 @@ async function pickPhotos(stories: Story[]): Promise<Photo[]> {
     const images = story.story_media.filter((m) => m.type === 'image' && mediaUrl(m));
     const step = Math.max(1, Math.floor(images.length / CANDIDATES_PER_STORY));
     const candidates = images.filter((_, i) => i % step === 0).slice(0, CANDIDATES_PER_STORY).map((m) => mediaUrl(m)!);
-    // One at a time, stopping once there are enough: Supabase refuses a burst of requests.
+    // One at a time, stopping once there are enough, so the media host never sees a burst.
     const good: Photo[] = [];
     for (const src of candidates) {
       if (good.length === PHOTOS_PER_STORY) break;
